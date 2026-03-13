@@ -30,7 +30,7 @@ Steam OSINT tool — collects and visualizes social connections of any Steam acc
 ## ⚙️ Installation
 
 ```bash
-git clone https://github.com/yourname/findlikegabe
+git clone https://github.com/youngrebe/findlikegabe
 cd findlikegabe
 python -m venv venv
 pip install -r requirements.txt
