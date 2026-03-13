@@ -45,12 +45,6 @@ pip install -r requirements.txt
 python config.py
 ```
 
-```json
-{
-    "token": "YOUR_STEAM_API_KEY"
-}
-```
-
 ---
 
 ## 👻 Usage
