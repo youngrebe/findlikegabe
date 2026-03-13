@@ -1,7 +1,3 @@
-Steam OSINT tool — collects and visualizes social connections of any Steam account.
-
----
-
 ## 🔍 What it does
 
 - Fetches profile summary, avatar, account creation date
