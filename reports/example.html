@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>rare</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0e1419;--bg2:#171d25;--bg3:#1e2a35;
+  --panel:#1b2838;--border:#2a475e;
+  --accent:#66c0f4;--accent2:#1b9bd1;
+  --gold:#c6a850;--green:#a4d007;--red:#c94040;
+  --text:#c7d5e0;--dim:#698fa8;
+}
+
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-weight:400;line-height:1.5;min-height:100vh}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.05) 3px,rgba(0,0,0,.05) 4px);pointer-events:none;z-index:9999}
+
+/* HEADER */
+.header{background:linear-gradient(160deg,#0a1520 0%,#1b2838 40%,#0f1c28 100%);border-bottom:2px solid var(--border);position:relative;overflow:hidden}
+.hglow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:700px;height:180px;background:radial-gradient(ellipse,rgba(102,192,244,.1) 0%,transparent 70%);pointer-events:none}
+.header-inner{max-width:1380px;margin:0 auto;padding:32px 40px;display:flex;align-items:center;gap:28px;position:relative;z-index:1}
+.target-ava{width:96px;height:96px;border:3px solid var(--gold);box-shadow:0 0 0 1px rgba(198,168,80,.25),0 0 28px rgba(198,168,80,.2);flex-shrink:0;image-rendering:pixelated}
+.header-text h1{font-family:'Rajdhani',sans-serif;font-size:36px;font-weight:700;color:#fff;letter-spacing:.5px;line-height:1}
+.steam-id{font-family:'Share Tech Mono',monospace;color:var(--accent);font-size:12px;margin-top:5px;letter-spacing:.5px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.chip{font-family:'Share Tech Mono',monospace;font-size:11px;padding:3px 10px;border:1px solid var(--border);background:rgba(102,192,244,.06);color:var(--dim)}
+.chip b{color:var(--accent)}
+.header-ts{margin-left:auto;text-align:right;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);line-height:2;flex-shrink:0}
+.ts-lbl{color:var(--accent);display:block;font-size:10px;letter-spacing:1px}
+
+/* STATS */
+.statsbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 40px;display:flex;justify-content:center;gap:50px;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;align-items:center;gap:2px}
+.stat-n{font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1}
+.stat-n.gold{color:var(--gold)}.stat-n.green{color:var(--green)}.stat-n.blue{color:var(--accent)}.stat-n.red{color:var(--red)}
+.stat-l{font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+
+/* NAV */
+.nav{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:center;padding:0 40px;overflow-x:auto}
+.nav-tab{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:14px 20px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s;user-select:none}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* PAGES */
+.page{display:none;max-width:1380px;margin:0 auto;padding:28px 40px}
+.page.active{display:block}
+
+/* PANEL */
+.panel{background:var(--bg2);border:1px solid var(--border);margin-bottom:20px;position:relative}
+.panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent 70%)}
+.panel-title{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--accent);padding:13px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.panel-title::before{content:'';width:7px;height:7px;background:var(--accent);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);flex-shrink:0}
+.panel-body{padding:20px}
+
+/* GRAPH */
+#graph-wrap{background:var(--bg);border:1px solid var(--border);position:relative;height:580px;overflow:hidden}
+#graph-svg{width:100%;height:100%}
+.graph-legend{position:absolute;bottom:14px;left:14px;display:flex;gap:14px;flex-wrap:wrap}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);font-family:'Share Tech Mono',monospace}
+.leg-dot{width:9px;height:9px;border-radius:50%}
+.gtip{position:absolute;background:var(--panel);border:1px solid var(--border);padding:8px 12px;font-size:12px;font-family:'Share Tech Mono',monospace;pointer-events:none;display:none;white-space:nowrap;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+
+/* TABLES */
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
+.data-table td{padding:8px 12px;border-bottom:1px solid rgba(42,71,94,.5);vertical-align:middle}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(102,192,244,.04)}
+.row-avatar{width:32px;height:32px;border:1px solid var(--border)}
+.badge{display:inline-block;padding:2px 8px;font-size:10px;border:1px solid;font-family:'Share Tech Mono',monospace;letter-spacing:.5px}
+
+/* ARCHIVE */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.avatar-grid{display:flex;flex-wrap:wrap;gap:12px}
+.av-item{display:flex;flex-direction:column;align-items:center;gap:4px}
+.av-item img{width:64px;height:64px;border:1px solid var(--border);image-rendering:pixelated}
+.av-item span{font-size:10px;color:var(--dim)}
+
+/* COMMENTS */
+.comments-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.comment-card{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent2);padding:12px 14px}
+.comment-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}
+.comment-ava{width:28px;height:28px;border:1px solid var(--border);flex-shrink:0;image-rendering:pixelated}
+.comment-ava-placeholder{width:28px;height:28px;background:var(--border);flex-shrink:0}
+.comment-author{display:flex;flex-direction:column;gap:1px;min-width:0}
+.comment-nick{color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
+.comment-nick:hover{color:#fff;text-decoration:underline}
+.comment-profile-link{display:flex;flex-shrink:0}
+.comment-profile-link:hover .comment-ava{border-color:var(--accent);box-shadow:0 0 8px rgba(102,192,244,.4)}
+.comment-body{font-size:13px;color:var(--text);line-height:1.4;white-space:pre-wrap;word-break:break-word}
+
+/* UTILS */
+.mono{font-family:'Share Tech Mono',monospace}
+.dim{color:var(--dim)}
+.accent{color:var(--accent)}
+.empty-cell{text-align:center;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:20px}
+
+@media(max-width:900px){
+  .header-inner,.statsbar,.nav,.page{padding-left:16px;padding-right:16px}
+  .two-col,.comments-grid{grid-template-columns:1fr}
+  .header-ts{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hglow"></div>
+  <div class="header-inner">
+    <img class="target-ava" src="https://avatars.steamstatic.com/38cf9e490e73491bf1ceef84364b3df1b6db9328_full.jpg" alt="avatar">
+    <div class="header-text">
+      <h1>rare</h1>
+      <div class="steam-id">76561199018462042</div>
+      <div class="chips">
+        <span class="chip">CREATED <b>13 Jan 2020</b></span>
+        <span class="chip">FRIENDS <b>54</b></span>
+        <span class="chip">CONNECTIONS <b>72</b></span>
+        <span class="chip">COMMENTS <b>44</b></span>
+      </div>
+    </div>
+    <div class="header-ts">
+      <span class="ts-lbl">REPORT GENERATED</span>
+      2026-03-13 21:23:10<br>FINDLIKEGABE!
+    </div>
+  </div>
+</div>
+
+<div class="statsbar">
+  <div class="stat"><span class="stat-n gold">54</span><span class="stat-l">Friends</span></div>
+  <div class="stat"><span class="stat-n blue">72</span><span class="stat-l">Connections</span></div>
+  <div class="stat"><span class="stat-n green">44</span><span class="stat-l">Comments</span></div>
+  <div class="stat"><span class="stat-n red">402</span><span class="stat-l">Name History</span></div>
+  <div class="stat"><span class="stat-n gold">131</span><span class="stat-l">Avatar History</span></div>
+  <div class="stat"><span class="stat-n blue">72</span><span class="stat-l">Graph Nodes</span></div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" data-tab="graph">SOCMINT</div>
+  <div class="nav-tab" data-tab="friends">Friends &amp; Connections</div>
+  <div class="nav-tab" data-tab="comments">Comments</div>
+  <div class="nav-tab" data-tab="archive">Archive</div>
+</div>
+
+<!-- GRAPH -->
+<div class="page active" id="tab-graph">
+  <div class="panel">
+    <div class="panel-title">Social Connection Graph - 72 nodes / 126 edges</div>
+    <div id="graph-wrap">
+      <svg id="graph-svg"></svg>
+      <div class="graph-legend">
+        <div class="leg-item"><div class="leg-dot" style="background:#c6a850"></div>Target</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#a4d007"></div>Friend</div>
+        <div class="leg-item"><div class="leg-dot" style="background:#66c0f4"></div>Connection</div>
+      </div>
+      <div class="gtip" id="gtip"></div>
+    </div>
+  </div>
+</div>
+
+<!-- FRIENDS -->
+<div class="page" id="tab-friends">
+  <div class="panel">
+    <div class="panel-title">Friends (54)</div>
+    <div class="panel-body" style="padding:0;overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th></th><th>Nickname</th><th>SteamID</th><th>Friends Since</th><th>Type</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg" class="row-avatar"></td>
+                <td>-Marshalll-</td>
+                <td class="mono dim" style="font-size:11px">76561199016881359</td>
+                <td class="mono dim">2025-05-17 20:48</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/50c1deea138373f4e8b288d6c84fb7081aaada93_full.jpg" class="row-avatar"></td>
+                <td>刀尸口匚丁仈卞丫ㄒ长丹</td>
+                <td class="mono dim" style="font-size:11px">76561199101511059</td>
+                <td class="mono dim">2025-03-15 06:55</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/d48d02585156ad9513051cd897f17c5a7a7f1f68_full.jpg" class="row-avatar"></td>
+                <td>Mar$</td>
+                <td class="mono dim" style="font-size:11px">76561199562431649</td>
+                <td class="mono dim">2025-07-06 22:00</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/eaba2639214cb255f06d04ce7e1430adc16ef58f_full.jpg" class="row-avatar"></td>
+                <td>Lanugare</td>
+                <td class="mono dim" style="font-size:11px">76561198365070240</td>
+                <td class="mono dim">2023-06-23 14:18</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/45a767ef556bdb615db5886d9cfeb5a30279ad77_full.jpg" class="row-avatar"></td>
+                <td>POJIRATEL_GALAKTIKI</td>
+                <td class="mono dim" style="font-size:11px">76561199177852443</td>
+                <td class="mono dim">2022-01-07 16:39</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/6caf9fd33311d78888f1097cff1b447b6708afcc_full.jpg" class="row-avatar"></td>
+                <td>Arturchik Parkourchik</td>
+                <td class="mono dim" style="font-size:11px">76561198994317324</td>
+                <td class="mono dim">2022-01-27 16:16</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/61d4f299ad6e1c3ad3be30064290ed8ffabb1d17_full.jpg" class="row-avatar"></td>
+                <td>Little Partizan</td>
+                <td class="mono dim" style="font-size:11px">76561199021828493</td>
+                <td class="mono dim">2025-04-06 21:25</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ad49e2fd843b8bd276eef7db0a5b1db447b2be9d_full.jpg" class="row-avatar"></td>
+                <td>Randomshtein</td>
+                <td class="mono dim" style="font-size:11px">76561199811833899</td>
+                <td class="mono dim">2025-07-24 22:04</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ae8fdc625012ea9e0db5a394bcc78a56813096d1_full.jpg" class="row-avatar"></td>
+                <td>Кирилл Фисташка</td>
+                <td class="mono dim" style="font-size:11px">76561199195139839</td>
+                <td class="mono dim">2025-03-06 01:43</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a55fe6ecdc9ff1008dc3fb73eff8f2e02569bf5d_full.jpg" class="row-avatar"></td>
+                <td>GoldenPotAte</td>
+                <td class="mono dim" style="font-size:11px">76561199117855889</td>
+                <td class="mono dim">2023-12-08 13:29</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/6d6d360c563e2d3c9fbe500a1a035e47a5c8826f_full.jpg" class="row-avatar"></td>
+                <td>Mmkh</td>
+                <td class="mono dim" style="font-size:11px">76561199497352222</td>
+                <td class="mono dim">2024-01-27 14:02</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a20bff0463a8357ca3c6d86ac02ff215c8d2208e_full.jpg" class="row-avatar"></td>
+                <td>󰀟Пчол󰀟</td>
+                <td class="mono dim" style="font-size:11px">76561199245342060</td>
+                <td class="mono dim">2024-10-04 22:10</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/d08d30e5be5da5df4e93ff72b7200fba54ce8d8f_full.jpg" class="row-avatar"></td>
+                <td>Maestro</td>
+                <td class="mono dim" style="font-size:11px">76561199039654377</td>
+                <td class="mono dim">2025-12-05 16:44</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/aeffe459d6db6decf8c1f4107e2b855ed08a5e00_full.jpg" class="row-avatar"></td>
+                <td>qqq</td>
+                <td class="mono dim" style="font-size:11px">76561199054294119</td>
+                <td class="mono dim">2025-09-20 00:07</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/e4567264f82c606fb4e4bb702cb995394848eec9_full.jpg" class="row-avatar"></td>
+                <td>JesseB</td>
+                <td class="mono dim" style="font-size:11px">76561199181478374</td>
+                <td class="mono dim">2025-12-17 03:18</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/92b9d2c3b29a307fa2f80901ec3b6cc961f077b1_full.jpg" class="row-avatar"></td>
+                <td>August liga de leyendas</td>
+                <td class="mono dim" style="font-size:11px">76561198842472200</td>
+                <td class="mono dim">2024-01-28 18:47</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5ad9da4eea7585f73ae9be2f99bdd4de6ce56ad0_full.jpg" class="row-avatar"></td>
+                <td>Feiman</td>
+                <td class="mono dim" style="font-size:11px">76561198997763317</td>
+                <td class="mono dim">2025-06-21 23:38</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ecf9675a9e0e32d138fa96d92c879734f5136215_full.jpg" class="row-avatar"></td>
+                <td>Kipper WHO?</td>
+                <td class="mono dim" style="font-size:11px">76561198166399080</td>
+                <td class="mono dim">2025-01-21 20:44</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/7318fee55ba6edabca045e2281a7c1fd447f97b8_full.jpg" class="row-avatar"></td>
+                <td>nenaturboss</td>
+                <td class="mono dim" style="font-size:11px">76561199230566416</td>
+                <td class="mono dim">2025-04-11 21:11</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/25c98d92ef106c76a08c20ce86ce611959542fe1_full.jpg" class="row-avatar"></td>
+                <td>Jim Bonacii</td>
+                <td class="mono dim" style="font-size:11px">76561199348028000</td>
+                <td class="mono dim">2025-07-07 10:48</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a7a3ac2a531ac0feca738d182fafbb81c7ef1d71_full.jpg" class="row-avatar"></td>
+                <td>Patix</td>
+                <td class="mono dim" style="font-size:11px">76561199036014853</td>
+                <td class="mono dim">2023-01-06 12:12</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a142b427efbb490ad6e1493bcbba38dd27d91bf6_full.jpg" class="row-avatar"></td>
+                <td>The_Global</td>
+                <td class="mono dim" style="font-size:11px">76561199473232732</td>
+                <td class="mono dim">2025-02-23 00:05</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1ae3bca62521d6117d48d1d058d5ddcb154cf750_full.jpg" class="row-avatar"></td>
+                <td>󰀐萌萌的新󰀐</td>
+                <td class="mono dim" style="font-size:11px">76561199088047561</td>
+                <td class="mono dim">2024-07-30 17:46</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/890bc208531e66d1f5fd9184b2493ba083aea00e_full.jpg" class="row-avatar"></td>
+                <td>Данил Колбасенко</td>
+                <td class="mono dim" style="font-size:11px">76561199076059219</td>
+                <td class="mono dim">2023-06-26 16:02</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg" class="row-avatar"></td>
+                <td>󰀒 alexa.vesna 󰀒</td>
+                <td class="mono dim" style="font-size:11px">76561198453411788</td>
+                <td class="mono dim">2023-06-03 18:12</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a0f0b930525e78a030fc95748f68fda5a0b312d1_full.jpg" class="row-avatar"></td>
+                <td>Gi-Go</td>
+                <td class="mono dim" style="font-size:11px">76561198416379642</td>
+                <td class="mono dim">2025-05-26 22:58</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/8ce4714bf5bd567ee79eeed4be90c78445bd12b7_full.jpg" class="row-avatar"></td>
+                <td>󰀒Баклан󰀒</td>
+                <td class="mono dim" style="font-size:11px">76561199223309447</td>
+                <td class="mono dim">2023-12-07 01:36</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/83cd5bcd8fcbc6cdbffe2576a8398325cab350d8_full.jpg" class="row-avatar"></td>
+                <td>Neylon Heaven</td>
+                <td class="mono dim" style="font-size:11px">76561199381213311</td>
+                <td class="mono dim">2023-10-27 22:07</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/e0bfa12b26b1c168843936529401dc3c9364ef6e_full.jpg" class="row-avatar"></td>
+                <td>Солевой Дед</td>
+                <td class="mono dim" style="font-size:11px">76561198095780023</td>
+                <td class="mono dim">2023-11-16 00:08</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/47534f2b225b6113aff8811ec31caa40e95755cd_full.jpg" class="row-avatar"></td>
+                <td>󰀋трэш󰀋</td>
+                <td class="mono dim" style="font-size:11px">76561199025081314</td>
+                <td class="mono dim">2023-06-06 19:51</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5803be6325bd93692333a8bf31d97bab6c0b71e8_full.jpg" class="row-avatar"></td>
+                <td>Keknutui</td>
+                <td class="mono dim" style="font-size:11px">76561198972771854</td>
+                <td class="mono dim">2026-01-01 19:46</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ad0c8c39de6ae6e29eef28cb61785ee88bf8e2bc_full.jpg" class="row-avatar"></td>
+                <td>Linux12</td>
+                <td class="mono dim" style="font-size:11px">76561198116832002</td>
+                <td class="mono dim">2022-10-23 15:18</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c75814f3f9f638f4d2975a52293c297eb124e1bd_full.jpg" class="row-avatar"></td>
+                <td>TraKtor</td>
+                <td class="mono dim" style="font-size:11px">76561199551115980</td>
+                <td class="mono dim">2026-02-09 18:47</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1721bf2f46cefad0c23d8c81da102f2e3df08a55_full.jpg" class="row-avatar"></td>
+                <td>Dawas</td>
+                <td class="mono dim" style="font-size:11px">76561199187184258</td>
+                <td class="mono dim">2023-10-15 11:51</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/47e7d5610ca4c0e6a5ba484761363e326dc2f350_full.jpg" class="row-avatar"></td>
+                <td>Bitey</td>
+                <td class="mono dim" style="font-size:11px">76561198062008079</td>
+                <td class="mono dim">2022-02-11 18:30</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1dedaadabd1b8972f315c25adb7ce547357067c8_full.jpg" class="row-avatar"></td>
+                <td>Zik_Games</td>
+                <td class="mono dim" style="font-size:11px">76561198967752077</td>
+                <td class="mono dim">2024-09-10 22:41</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/77ede991564239a8111f62933f8a07c78286ec0c_full.jpg" class="row-avatar"></td>
+                <td>Ogarodnek</td>
+                <td class="mono dim" style="font-size:11px">76561199192655522</td>
+                <td class="mono dim">2025-02-22 23:58</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/dd596ef784b4f6cbf39caad054029c89c15a908e_full.jpg" class="row-avatar"></td>
+                <td>Justice.jpg</td>
+                <td class="mono dim" style="font-size:11px">76561198017566455</td>
+                <td class="mono dim">2023-11-12 14:14</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/f84972d2f653ef28bac329aa813f29d7a145ca4f_full.jpg" class="row-avatar"></td>
+                <td>lil loaded</td>
+                <td class="mono dim" style="font-size:11px">76561199438334149</td>
+                <td class="mono dim">2025-05-18 02:25</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/2b963ed04c935a4dcdd5691517a1f0cc43a2d934_full.jpg" class="row-avatar"></td>
+                <td>silviussa</td>
+                <td class="mono dim" style="font-size:11px">76561199185483792</td>
+                <td class="mono dim">2023-04-29 03:34</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/79a8119bd2a027755f93872d0d09b959909a0405_full.jpg" class="row-avatar"></td>
+                <td>Andrewex</td>
+                <td class="mono dim" style="font-size:11px">76561199221119315</td>
+                <td class="mono dim">2025-02-28 22:34</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/76c2c57990ae1af551df7337b66debf3946cccbc_full.jpg" class="row-avatar"></td>
+                <td>mazbezzz</td>
+                <td class="mono dim" style="font-size:11px">76561198960451159</td>
+                <td class="mono dim">2022-01-20 00:02</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/0341ba8f018a519c9b8d67c79b432d9066aeac69_full.jpg" class="row-avatar"></td>
+                <td>NsD ★ •Nakuma•</td>
+                <td class="mono dim" style="font-size:11px">76561199207564638</td>
+                <td class="mono dim">2022-02-25 15:53</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/31466bfbfe84f6de72acab3334863ac0cceceef4_full.jpg" class="row-avatar"></td>
+                <td>Skiller</td>
+                <td class="mono dim" style="font-size:11px">76561198056448151</td>
+                <td class="mono dim">2026-02-03 16:33</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/9dc478703a857e295bca57a4f735a3ccd0bfc251_full.jpg" class="row-avatar"></td>
+                <td>∮❆Elternass❆∮</td>
+                <td class="mono dim" style="font-size:11px">76561199397116107</td>
+                <td class="mono dim">2025-06-06 19:59</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/9379ade52b03024563cd7ea995bf53eb0bf5cb8c_full.jpg" class="row-avatar"></td>
+                <td>Чай</td>
+                <td class="mono dim" style="font-size:11px">76561199405824255</td>
+                <td class="mono dim">2023-01-31 23:42</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1b7e6471e5b8255d9cc2dc22e4a02525e03b115b_full.jpg" class="row-avatar"></td>
+                <td>Vergil</td>
+                <td class="mono dim" style="font-size:11px">76561199210373017</td>
+                <td class="mono dim">2022-10-02 21:52</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a0abb3c94a869f5f5a4cb105ff3af677f93c2a7f_full.jpg" class="row-avatar"></td>
+                <td>Probot</td>
+                <td class="mono dim" style="font-size:11px">76561199119627994</td>
+                <td class="mono dim">2023-01-30 18:38</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/50ed87237cd2ab636c38cd3198593147030bd571_full.jpg" class="row-avatar"></td>
+                <td>Sbryf</td>
+                <td class="mono dim" style="font-size:11px">76561198318336717</td>
+                <td class="mono dim">2025-02-07 02:29</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/71bfce02c6e9d0bfa9fa85459b81be6bd0283d6a_full.jpg" class="row-avatar"></td>
+                <td>Elvis Presley</td>
+                <td class="mono dim" style="font-size:11px">76561199128509202</td>
+                <td class="mono dim">2024-08-24 17:35</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a7d16793c2b136cceb768b65625c19d3c85acbeb_full.jpg" class="row-avatar"></td>
+                <td>emankc¹n</td>
+                <td class="mono dim" style="font-size:11px">76561199244783431</td>
+                <td class="mono dim">2026-02-03 18:06</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1d70e60f7f20ba09461c12e4d362e1e0a00bc3b6_full.jpg" class="row-avatar"></td>
+                <td>󰀀The Long Diablo2.0󰀀</td>
+                <td class="mono dim" style="font-size:11px">76561199098831103</td>
+                <td class="mono dim">2022-11-12 03:34</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c3e808aa402ee61badd29d2a35baebf971efb71f_full.jpg" class="row-avatar"></td>
+                <td>BADnik</td>
+                <td class="mono dim" style="font-size:11px">76561198178811654</td>
+                <td class="mono dim">2025-10-28 23:15</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1994cab6cd82b234a5e396158028e5341a9aacb7_full.jpg" class="row-avatar"></td>
+                <td>Ушел в Армию</td>
+                <td class="mono dim" style="font-size:11px">76561199206570585</td>
+                <td class="mono dim">2025-01-27 21:55</td>
+                <td><span class="badge" style="background:#a4d00722;border-color:#a4d007;color:#a4d007">friend</span></td>
+            </tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">Connections (72)</div>
+    <div class="panel-body" style="padding:0;overflow-x:auto">
+      <table class="data-table">
+        <thead><tr><th></th><th>Nickname</th><th>SteamID</th><th>Since</th><th>Type</th></tr></thead>
+        <tbody>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/d79026fac45b1bc64f1c814e1a7e883ab2198810_full.jpg" class="row-avatar"></td>
+                <td>󰀛OLIVIA󰀛</td>
+                <td class="mono dim" style="font-size:11px">76561199835643911</td>
+                <td class="mono dim">2026-03-12 07:29</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/9b4de9738ce5e8e281683282881f606a8b353f86_full.jpg" class="row-avatar"></td>
+                <td>Wali</td>
+                <td class="mono dim" style="font-size:11px">76561199855175908</td>
+                <td class="mono dim">2026-03-10 09:21</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg" class="row-avatar"></td>
+                <td>Apch</td>
+                <td class="mono dim" style="font-size:11px">76561199516455145</td>
+                <td class="mono dim">2026-03-09 17:50</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg" class="row-avatar"></td>
+                <td>AmNum</td>
+                <td class="mono dim" style="font-size:11px">76561199698759942</td>
+                <td class="mono dim">2026-03-04 13:40</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg" class="row-avatar"></td>
+                <td>heheess</td>
+                <td class="mono dim" style="font-size:11px">76561199206964399</td>
+                <td class="mono dim">2026-02-13 02:15</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5ee76f4ee511530ea12ba90d68fa8bca34ccee08_full.jpg" class="row-avatar"></td>
+                <td>ArErNonಪೋಡಿಗೆ</td>
+                <td class="mono dim" style="font-size:11px">76561199014828960</td>
+                <td class="mono dim">2026-02-12 21:43</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg" class="row-avatar"></td>
+                <td>биг яху ОООО</td>
+                <td class="mono dim" style="font-size:11px">76561199231694390</td>
+                <td class="mono dim">2026-01-28 14:09</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/45a767ef556bdb615db5886d9cfeb5a30279ad77_full.jpg" class="row-avatar"></td>
+                <td>POJIRATEL_GALAKTIKI</td>
+                <td class="mono dim" style="font-size:11px">76561199177852443</td>
+                <td class="mono dim">2026-01-21 03:03</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/61d4f299ad6e1c3ad3be30064290ed8ffabb1d17_full.jpg" class="row-avatar"></td>
+                <td>Little Partizan</td>
+                <td class="mono dim" style="font-size:11px">76561199021828493</td>
+                <td class="mono dim">2026-01-08 01:44</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg" class="row-avatar"></td>
+                <td>-Marshalll-</td>
+                <td class="mono dim" style="font-size:11px">76561199016881359</td>
+                <td class="mono dim">2026-01-02 21:28</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/611b3c532412b27194c5480dd5b6863f49401c67_full.jpg" class="row-avatar"></td>
+                <td>🔰Molfar🔰</td>
+                <td class="mono dim" style="font-size:11px">76561198156811558</td>
+                <td class="mono dim">2026-01-02 18:07</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/eaba2639214cb255f06d04ce7e1430adc16ef58f_full.jpg" class="row-avatar"></td>
+                <td>Lanugare</td>
+                <td class="mono dim" style="font-size:11px">76561198365070240</td>
+                <td class="mono dim">2026-01-01 20:53</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c2d4e2653a82f2724722c70a0e949a0778e3dc5f_full.jpg" class="row-avatar"></td>
+                <td>Da Mi un Grrrr</td>
+                <td class="mono dim" style="font-size:11px">76561198400644872</td>
+                <td class="mono dim">2025-12-09 14:49</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/093d76fcfb27216e2d24cd88d7784a410fa6fbc5_full.jpg" class="row-avatar"></td>
+                <td>Patix</td>
+                <td class="mono dim" style="font-size:11px">76561199822928883</td>
+                <td class="mono dim">2025-11-17 22:17</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5b8825b34c5d77b00c3a18897f2f1175fa0e0e57_full.jpg" class="row-avatar"></td>
+                <td>Pego</td>
+                <td class="mono dim" style="font-size:11px">76561198370374250</td>
+                <td class="mono dim">2025-09-12 20:02</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/97e463a36f2693f6158631fb69c4074694019c20_full.jpg" class="row-avatar"></td>
+                <td>natureboss</td>
+                <td class="mono dim" style="font-size:11px">76561199513336447</td>
+                <td class="mono dim">2025-08-31 19:22</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/20b5a0f40f9171e6caea5f5deabcf8822ba03c64_full.jpg" class="row-avatar"></td>
+                <td>Рыба не</td>
+                <td class="mono dim" style="font-size:11px">76561199071567515</td>
+                <td class="mono dim">2025-08-31 13:28</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/0b2f011136c60ddbd58012073f5dae755c843693_full.jpg" class="row-avatar"></td>
+                <td>Сult of Daxao</td>
+                <td class="mono dim" style="font-size:11px">76561199353746526</td>
+                <td class="mono dim">2025-08-30 04:46</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/07bd7cf7f6a024ec1d910b9f3cb1a647bacbd02c_full.jpg" class="row-avatar"></td>
+                <td>Iabsemmelia</td>
+                <td class="mono dim" style="font-size:11px">76561198863459473</td>
+                <td class="mono dim">2025-08-28 19:24</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/6caf9fd33311d78888f1097cff1b447b6708afcc_full.jpg" class="row-avatar"></td>
+                <td>Arturchik Parkourchik</td>
+                <td class="mono dim" style="font-size:11px">76561198994317324</td>
+                <td class="mono dim">2025-08-27 17:10</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ad49e2fd843b8bd276eef7db0a5b1db447b2be9d_full.jpg" class="row-avatar"></td>
+                <td>Randomshtein</td>
+                <td class="mono dim" style="font-size:11px">76561199811833899</td>
+                <td class="mono dim">2025-08-26 22:48</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/dcce5f1232dfa1c2ff448233398496c6baedf12d_full.jpg" class="row-avatar"></td>
+                <td>[ЧВ] ☭Минотавр☭</td>
+                <td class="mono dim" style="font-size:11px">76561199026669453</td>
+                <td class="mono dim">2025-08-24 13:15</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/d48d02585156ad9513051cd897f17c5a7a7f1f68_full.jpg" class="row-avatar"></td>
+                <td>Mar$</td>
+                <td class="mono dim" style="font-size:11px">76561199562431649</td>
+                <td class="mono dim">2025-08-22 16:45</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/19dc6654633dbf9b86f8f8f38469e9f42567b276_full.jpg" class="row-avatar"></td>
+                <td>Паучий друг</td>
+                <td class="mono dim" style="font-size:11px">76561199509533216</td>
+                <td class="mono dim">2025-08-21 19:14</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/50c1deea138373f4e8b288d6c84fb7081aaada93_full.jpg" class="row-avatar"></td>
+                <td>刀尸口匚丁仈卞丫ㄒ长丹</td>
+                <td class="mono dim" style="font-size:11px">76561199101511059</td>
+                <td class="mono dim">2025-08-16 23:34</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/38cf9e490e73491bf1ceef84364b3df1b6db9328_full.jpg" class="row-avatar"></td>
+                <td>rare</td>
+                <td class="mono dim" style="font-size:11px">76561199018462042</td>
+                <td class="mono dim">2025-08-01 12:27</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ae8fdc625012ea9e0db5a394bcc78a56813096d1_full.jpg" class="row-avatar"></td>
+                <td>Кирилл Фисташка</td>
+                <td class="mono dim" style="font-size:11px">76561199195139839</td>
+                <td class="mono dim">2025-03-06 01:43</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a55fe6ecdc9ff1008dc3fb73eff8f2e02569bf5d_full.jpg" class="row-avatar"></td>
+                <td>GoldenPotAte</td>
+                <td class="mono dim" style="font-size:11px">76561199117855889</td>
+                <td class="mono dim">2023-12-08 13:29</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/6d6d360c563e2d3c9fbe500a1a035e47a5c8826f_full.jpg" class="row-avatar"></td>
+                <td>Mmkh</td>
+                <td class="mono dim" style="font-size:11px">76561199497352222</td>
+                <td class="mono dim">2024-01-27 14:02</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a20bff0463a8357ca3c6d86ac02ff215c8d2208e_full.jpg" class="row-avatar"></td>
+                <td>󰀟Пчол󰀟</td>
+                <td class="mono dim" style="font-size:11px">76561199245342060</td>
+                <td class="mono dim">2024-10-04 22:10</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/d08d30e5be5da5df4e93ff72b7200fba54ce8d8f_full.jpg" class="row-avatar"></td>
+                <td>Maestro</td>
+                <td class="mono dim" style="font-size:11px">76561199039654377</td>
+                <td class="mono dim">2025-12-05 16:44</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/aeffe459d6db6decf8c1f4107e2b855ed08a5e00_full.jpg" class="row-avatar"></td>
+                <td>qqq</td>
+                <td class="mono dim" style="font-size:11px">76561199054294119</td>
+                <td class="mono dim">2025-09-20 00:07</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/e4567264f82c606fb4e4bb702cb995394848eec9_full.jpg" class="row-avatar"></td>
+                <td>JesseB</td>
+                <td class="mono dim" style="font-size:11px">76561199181478374</td>
+                <td class="mono dim">2025-12-17 03:18</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/92b9d2c3b29a307fa2f80901ec3b6cc961f077b1_full.jpg" class="row-avatar"></td>
+                <td>August liga de leyendas</td>
+                <td class="mono dim" style="font-size:11px">76561198842472200</td>
+                <td class="mono dim">2024-01-28 18:47</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5ad9da4eea7585f73ae9be2f99bdd4de6ce56ad0_full.jpg" class="row-avatar"></td>
+                <td>Feiman</td>
+                <td class="mono dim" style="font-size:11px">76561198997763317</td>
+                <td class="mono dim">2025-06-21 23:38</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ecf9675a9e0e32d138fa96d92c879734f5136215_full.jpg" class="row-avatar"></td>
+                <td>Kipper WHO?</td>
+                <td class="mono dim" style="font-size:11px">76561198166399080</td>
+                <td class="mono dim">2025-01-21 20:44</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/7318fee55ba6edabca045e2281a7c1fd447f97b8_full.jpg" class="row-avatar"></td>
+                <td>nenaturboss</td>
+                <td class="mono dim" style="font-size:11px">76561199230566416</td>
+                <td class="mono dim">2025-04-11 21:11</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/25c98d92ef106c76a08c20ce86ce611959542fe1_full.jpg" class="row-avatar"></td>
+                <td>Jim Bonacii</td>
+                <td class="mono dim" style="font-size:11px">76561199348028000</td>
+                <td class="mono dim">2025-07-07 10:48</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a7a3ac2a531ac0feca738d182fafbb81c7ef1d71_full.jpg" class="row-avatar"></td>
+                <td>Patix</td>
+                <td class="mono dim" style="font-size:11px">76561199036014853</td>
+                <td class="mono dim">2023-01-06 12:12</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a142b427efbb490ad6e1493bcbba38dd27d91bf6_full.jpg" class="row-avatar"></td>
+                <td>The_Global</td>
+                <td class="mono dim" style="font-size:11px">76561199473232732</td>
+                <td class="mono dim">2025-02-23 00:05</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1ae3bca62521d6117d48d1d058d5ddcb154cf750_full.jpg" class="row-avatar"></td>
+                <td>󰀐萌萌的新󰀐</td>
+                <td class="mono dim" style="font-size:11px">76561199088047561</td>
+                <td class="mono dim">2024-07-30 17:46</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/890bc208531e66d1f5fd9184b2493ba083aea00e_full.jpg" class="row-avatar"></td>
+                <td>Данил Колбасенко</td>
+                <td class="mono dim" style="font-size:11px">76561199076059219</td>
+                <td class="mono dim">2023-06-26 16:02</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg" class="row-avatar"></td>
+                <td>󰀒 alexa.vesna 󰀒</td>
+                <td class="mono dim" style="font-size:11px">76561198453411788</td>
+                <td class="mono dim">2023-06-03 18:12</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a0f0b930525e78a030fc95748f68fda5a0b312d1_full.jpg" class="row-avatar"></td>
+                <td>Gi-Go</td>
+                <td class="mono dim" style="font-size:11px">76561198416379642</td>
+                <td class="mono dim">2025-05-26 22:58</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/8ce4714bf5bd567ee79eeed4be90c78445bd12b7_full.jpg" class="row-avatar"></td>
+                <td>󰀒Баклан󰀒</td>
+                <td class="mono dim" style="font-size:11px">76561199223309447</td>
+                <td class="mono dim">2023-12-07 01:36</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/83cd5bcd8fcbc6cdbffe2576a8398325cab350d8_full.jpg" class="row-avatar"></td>
+                <td>Neylon Heaven</td>
+                <td class="mono dim" style="font-size:11px">76561199381213311</td>
+                <td class="mono dim">2023-10-27 22:07</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/e0bfa12b26b1c168843936529401dc3c9364ef6e_full.jpg" class="row-avatar"></td>
+                <td>Солевой Дед</td>
+                <td class="mono dim" style="font-size:11px">76561198095780023</td>
+                <td class="mono dim">2023-11-16 00:08</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/47534f2b225b6113aff8811ec31caa40e95755cd_full.jpg" class="row-avatar"></td>
+                <td>󰀋трэш󰀋</td>
+                <td class="mono dim" style="font-size:11px">76561199025081314</td>
+                <td class="mono dim">2023-06-06 19:51</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/5803be6325bd93692333a8bf31d97bab6c0b71e8_full.jpg" class="row-avatar"></td>
+                <td>Keknutui</td>
+                <td class="mono dim" style="font-size:11px">76561198972771854</td>
+                <td class="mono dim">2026-01-01 19:46</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/ad0c8c39de6ae6e29eef28cb61785ee88bf8e2bc_full.jpg" class="row-avatar"></td>
+                <td>Linux12</td>
+                <td class="mono dim" style="font-size:11px">76561198116832002</td>
+                <td class="mono dim">2022-10-23 15:18</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c75814f3f9f638f4d2975a52293c297eb124e1bd_full.jpg" class="row-avatar"></td>
+                <td>TraKtor</td>
+                <td class="mono dim" style="font-size:11px">76561199551115980</td>
+                <td class="mono dim">2026-02-09 18:47</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1721bf2f46cefad0c23d8c81da102f2e3df08a55_full.jpg" class="row-avatar"></td>
+                <td>Dawas</td>
+                <td class="mono dim" style="font-size:11px">76561199187184258</td>
+                <td class="mono dim">2023-10-15 11:51</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/47e7d5610ca4c0e6a5ba484761363e326dc2f350_full.jpg" class="row-avatar"></td>
+                <td>Bitey</td>
+                <td class="mono dim" style="font-size:11px">76561198062008079</td>
+                <td class="mono dim">2022-02-11 18:30</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1dedaadabd1b8972f315c25adb7ce547357067c8_full.jpg" class="row-avatar"></td>
+                <td>Zik_Games</td>
+                <td class="mono dim" style="font-size:11px">76561198967752077</td>
+                <td class="mono dim">2024-09-10 22:41</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/77ede991564239a8111f62933f8a07c78286ec0c_full.jpg" class="row-avatar"></td>
+                <td>Ogarodnek</td>
+                <td class="mono dim" style="font-size:11px">76561199192655522</td>
+                <td class="mono dim">2025-02-22 23:58</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/dd596ef784b4f6cbf39caad054029c89c15a908e_full.jpg" class="row-avatar"></td>
+                <td>Justice.jpg</td>
+                <td class="mono dim" style="font-size:11px">76561198017566455</td>
+                <td class="mono dim">2023-11-12 14:14</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/f84972d2f653ef28bac329aa813f29d7a145ca4f_full.jpg" class="row-avatar"></td>
+                <td>lil loaded</td>
+                <td class="mono dim" style="font-size:11px">76561199438334149</td>
+                <td class="mono dim">2025-05-18 02:25</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/2b963ed04c935a4dcdd5691517a1f0cc43a2d934_full.jpg" class="row-avatar"></td>
+                <td>silviussa</td>
+                <td class="mono dim" style="font-size:11px">76561199185483792</td>
+                <td class="mono dim">2023-04-29 03:34</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/79a8119bd2a027755f93872d0d09b959909a0405_full.jpg" class="row-avatar"></td>
+                <td>Andrewex</td>
+                <td class="mono dim" style="font-size:11px">76561199221119315</td>
+                <td class="mono dim">2025-02-28 22:34</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/76c2c57990ae1af551df7337b66debf3946cccbc_full.jpg" class="row-avatar"></td>
+                <td>mazbezzz</td>
+                <td class="mono dim" style="font-size:11px">76561198960451159</td>
+                <td class="mono dim">2022-01-20 00:02</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/0341ba8f018a519c9b8d67c79b432d9066aeac69_full.jpg" class="row-avatar"></td>
+                <td>NsD ★ •Nakuma•</td>
+                <td class="mono dim" style="font-size:11px">76561199207564638</td>
+                <td class="mono dim">2022-02-25 15:53</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/31466bfbfe84f6de72acab3334863ac0cceceef4_full.jpg" class="row-avatar"></td>
+                <td>Skiller</td>
+                <td class="mono dim" style="font-size:11px">76561198056448151</td>
+                <td class="mono dim">2026-02-03 16:33</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/9dc478703a857e295bca57a4f735a3ccd0bfc251_full.jpg" class="row-avatar"></td>
+                <td>∮❆Elternass❆∮</td>
+                <td class="mono dim" style="font-size:11px">76561199397116107</td>
+                <td class="mono dim">2025-06-06 19:59</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/9379ade52b03024563cd7ea995bf53eb0bf5cb8c_full.jpg" class="row-avatar"></td>
+                <td>Чай</td>
+                <td class="mono dim" style="font-size:11px">76561199405824255</td>
+                <td class="mono dim">2023-01-31 23:42</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1b7e6471e5b8255d9cc2dc22e4a02525e03b115b_full.jpg" class="row-avatar"></td>
+                <td>Vergil</td>
+                <td class="mono dim" style="font-size:11px">76561199210373017</td>
+                <td class="mono dim">2022-10-02 21:52</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a0abb3c94a869f5f5a4cb105ff3af677f93c2a7f_full.jpg" class="row-avatar"></td>
+                <td>Probot</td>
+                <td class="mono dim" style="font-size:11px">76561199119627994</td>
+                <td class="mono dim">2023-01-30 18:38</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/50ed87237cd2ab636c38cd3198593147030bd571_full.jpg" class="row-avatar"></td>
+                <td>Sbryf</td>
+                <td class="mono dim" style="font-size:11px">76561198318336717</td>
+                <td class="mono dim">2025-02-07 02:29</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/71bfce02c6e9d0bfa9fa85459b81be6bd0283d6a_full.jpg" class="row-avatar"></td>
+                <td>Elvis Presley</td>
+                <td class="mono dim" style="font-size:11px">76561199128509202</td>
+                <td class="mono dim">2024-08-24 17:35</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/a7d16793c2b136cceb768b65625c19d3c85acbeb_full.jpg" class="row-avatar"></td>
+                <td>emankc¹n</td>
+                <td class="mono dim" style="font-size:11px">76561199244783431</td>
+                <td class="mono dim">2026-02-03 18:06</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1d70e60f7f20ba09461c12e4d362e1e0a00bc3b6_full.jpg" class="row-avatar"></td>
+                <td>󰀀The Long Diablo2.0󰀀</td>
+                <td class="mono dim" style="font-size:11px">76561199098831103</td>
+                <td class="mono dim">2022-11-12 03:34</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/c3e808aa402ee61badd29d2a35baebf971efb71f_full.jpg" class="row-avatar"></td>
+                <td>BADnik</td>
+                <td class="mono dim" style="font-size:11px">76561198178811654</td>
+                <td class="mono dim">2025-10-28 23:15</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr>
+            <tr>
+                <td><img src="https://avatars.steamstatic.com/1994cab6cd82b234a5e396158028e5341a9aacb7_full.jpg" class="row-avatar"></td>
+                <td>Ушел в Армию</td>
+                <td class="mono dim" style="font-size:11px">76561199206570585</td>
+                <td class="mono dim">2025-01-27 21:55</td>
+                <td><span class="badge" style="background:#66c0f422;border-color:#66c0f4;color:#66c0f4">connection</span></td>
+            </tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- COMMENTS -->
+<div class="page" id="tab-comments">
+  <div class="panel">
+    <div class="panel-title">Profile Comments (44)</div>
+    <div class="panel-body">
+      <div class="comments-grid">
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/d79026fac45b1bc64f1c814e1a7e883ab2198810_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-nick">󰀛OLIVIA󰀛</a>
+                        <span class="mono dim" style="font-size:10px">76561199835643911</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-03-12 07:29</span>
+                </div>
+                <div class="comment-body">⠀⠀⠀</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/9b4de9738ce5e8e281683282881f606a8b353f86_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-nick">Wali</a>
+                        <span class="mono dim" style="font-size:10px">76561199855175908</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-03-10 09:21</span>
+                </div>
+                <div class="comment-body">купи mаргариту 40 см лп</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-nick">Apch</a>
+                        <span class="mono dim" style="font-size:10px">76561199516455145</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-03-09 17:50</span>
+                </div>
+                <div class="comment-body">купи теслу лп</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/9b4de9738ce5e8e281683282881f606a8b353f86_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-nick">Wali</a>
+                        <span class="mono dim" style="font-size:10px">76561199855175908</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-03-08 22:52</span>
+                </div>
+                <div class="comment-body">Человек</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-nick">AmNum</a>
+                        <span class="mono dim" style="font-size:10px">76561199698759942</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-03-04 13:40</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-nick">heheess</a>
+                        <span class="mono dim" style="font-size:10px">76561199206964399</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-02-13 02:15</span>
+                </div>
+                <div class="comment-body">This comment is awaiting analysis by our automated content check system. It will be temporarily hidden until we verify that it does not contain harmful content (e.g. links to websites that attempt to steal information).</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199014828960" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/5ee76f4ee511530ea12ba90d68fa8bca34ccee08_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199014828960" target="_blank" class="comment-nick">ArErNonಪೋಡಿಗೆ</a>
+                        <span class="mono dim" style="font-size:10px">76561199014828960</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-02-12 21:43</span>
+                </div>
+                <div class="comment-body">Бро подари казан</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/9b4de9738ce5e8e281683282881f606a8b353f86_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199855175908" target="_blank" class="comment-nick">Wali</a>
+                        <span class="mono dim" style="font-size:10px">76561199855175908</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-02-02 15:14</span>
+                </div>
+                <div class="comment-body">понятно</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-nick">биг яху ОООО</a>
+                        <span class="mono dim" style="font-size:10px">76561199231694390</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-28 14:09</span>
+                </div>
+                <div class="comment-body">главный спонсор клеи</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/d79026fac45b1bc64f1c814e1a7e883ab2198810_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-nick">󰀛OLIVIA󰀛</a>
+                        <span class="mono dim" style="font-size:10px">76561199835643911</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-25 22:33</span>
+                </div>
+                <div class="comment-body">Оставляйте комп на 1 год включенным в игре, и будет стока же часов.</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199177852443" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/45a767ef556bdb615db5886d9cfeb5a30279ad77_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199177852443" target="_blank" class="comment-nick">POJIRATEL_GALAKTIKI</a>
+                        <span class="mono dim" style="font-size:10px">76561199177852443</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-21 03:03</span>
+                </div>
+                <div class="comment-body">Мой кумир хочу столько же часов</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/d79026fac45b1bc64f1c814e1a7e883ab2198810_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199835643911" target="_blank" class="comment-nick">󰀛OLIVIA󰀛</a>
+                        <span class="mono dim" style="font-size:10px">76561199835643911</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-17 23:22</span>
+                </div>
+                <div class="comment-body">Он хочет поставить рекорд по наигранным часам в дст</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-nick">биг яху ОООО</a>
+                        <span class="mono dim" style="font-size:10px">76561199231694390</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-12 00:06</span>
+                </div>
+                <div class="comment-body">ученик бездомного тв</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199021828493" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/61d4f299ad6e1c3ad3be30064290ed8ffabb1d17_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199021828493" target="_blank" class="comment-nick">Little Partizan</a>
+                        <span class="mono dim" style="font-size:10px">76561199021828493</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-08 01:44</span>
+                </div>
+                <div class="comment-body">zli 107%</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-nick">-Marshalll-</a>
+                        <span class="mono dim" style="font-size:10px">76561199016881359</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-02 21:28</span>
+                </div>
+                <div class="comment-body"></div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198156811558" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/611b3c532412b27194c5480dd5b6863f49401c67_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198156811558" target="_blank" class="comment-nick">🔰Molfar🔰</a>
+                        <span class="mono dim" style="font-size:10px">76561198156811558</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-02 18:07</span>
+                </div>
+                <div class="comment-body">RU: Я желаю тебе здоровья и счастья в новом году!
+DE: Ich wünsche dir ein gesundes und glückliches neues Jahr!</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-nick">heheess</a>
+                        <span class="mono dim" style="font-size:10px">76561199206964399</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-02 01:43</span>
+                </div>
+                <div class="comment-body">раре катает на фераре</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198365070240" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/eaba2639214cb255f06d04ce7e1430adc16ef58f_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198365070240" target="_blank" class="comment-nick">Lanugare</a>
+                        <span class="mono dim" style="font-size:10px">76561198365070240</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-01 20:53</span>
+                </div>
+                <div class="comment-body"></div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-nick">Apch</a>
+                        <span class="mono dim" style="font-size:10px">76561199516455145</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2026-01-01 01:25</span>
+                </div>
+                <div class="comment-body">ПР ЛПШК С НГ</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-nick">-Marshalll-</a>
+                        <span class="mono dim" style="font-size:10px">76561199016881359</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-12-30 14:01</span>
+                </div>
+                <div class="comment-body">НЕ ЖОПАЕД=НЕ РАРЕ</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-nick">Apch</a>
+                        <span class="mono dim" style="font-size:10px">76561199516455145</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-12-28 11:06</span>
+                </div>
+                <div class="comment-body">⣿⣆⠱⣝⡵⣝⢅⠙⣿⢕⢕⢕⢕⢝⣥⢒⠅⣿⣿⣿⡿⣳⣌⠪⡪⣡⢑
+⣿⣿⣦⠹⣳⣳⣕⢅⠈⢗⢕⢕⢕⢕⢕⢈⢆⠟⠋⠉⠁⠉⠉⠁⠈⠼⢐
+⢰⣶⣶⣦⣝⢝⢕⢕⠅⡆⢕⢕⢕⢕⢕⣴⠏⣠⡶⠛⡉⡉⡛⢶⣦⡀⠐
+⡄⢻⢟⣿⣿⣷⣕⣕⣅⣿⣔⣕⣵⣵⣿⣿⢠⣿⢠⣮⡈⣌⠨⠅⠹⣷⡀
+⡵⠟⠈⢀⣀⣀⡀⠉⢿⣿⣿⣿⣿⣿⣿⣿⣼⣿⢈⡋⠴⢿⡟⣡⡇⣿⡇
+⠁⣠⣾⠟⡉⡉⡉⠻⣦⣻⣿⣿⣿⣿⣿⣿⣿⣿⣧⠸⣿⣦⣥⣿⡇⡿⣰
+⢰⣿⡏⣴⣌⠈⣌⠡⠈⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣬⣉⣉⣁⣄⢖⢕
+⢻⣿⡇⢙⠁⠴⢿⡟⣡⡆⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⣵
+⣄⣻⣿⣌⠘⢿⣷⣥⣿⠇⣿⣿⣿⣿⣿⣿⠛⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿
+⢄⠻⣿⣟⠿⠦⠍⠉⣡⣾⣿⣿⣿⣿⣿⣿⢸⣿⣦⠙⣿⣿⣿⣿⣿⣿⣿
+⡑⣑⣈⣻⢗⢟⢞⢝⣻⣿⣿⣿⣿⣿⣿⣿⠸⣿⠿⠃⣿⣿⣿⣿⣿⣿⡿
+⡵⡈⢟⢕⢕⢕⢕⣵⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣿⣿⣿⣿⣿⠿⠋⣀</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199516455145" target="_blank" class="comment-nick">Apch</a>
+                        <span class="mono dim" style="font-size:10px">76561199516455145</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-12-16 04:57</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198400644872" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/c2d4e2653a82f2724722c70a0e949a0778e3dc5f_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198400644872" target="_blank" class="comment-nick">Da Mi un Grrrr</a>
+                        <span class="mono dim" style="font-size:10px">76561198400644872</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-12-09 14:49</span>
+                </div>
+                <div class="comment-body">бегите от него</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-nick">heheess</a>
+                        <span class="mono dim" style="font-size:10px">76561199206964399</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-12-03 23:54</span>
+                </div>
+                <div class="comment-body">донатер глупый</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199822928883" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/093d76fcfb27216e2d24cd88d7784a410fa6fbc5_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199822928883" target="_blank" class="comment-nick">Patix</a>
+                        <span class="mono dim" style="font-size:10px">76561199822928883</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-11-17 22:17</span>
+                </div>
+                <div class="comment-body">дебил тупой</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-nick">биг яху ОООО</a>
+                        <span class="mono dim" style="font-size:10px">76561199231694390</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-11-03 18:46</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-nick">AmNum</a>
+                        <span class="mono dim" style="font-size:10px">76561199698759942</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-11-03 01:29</span>
+                </div>
+                <div class="comment-body">Пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199016881359" target="_blank" class="comment-nick">-Marshalll-</a>
+                        <span class="mono dim" style="font-size:10px">76561199016881359</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-09-18 21:34</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199231694390" target="_blank" class="comment-nick">биг яху ОООО</a>
+                        <span class="mono dim" style="font-size:10px">76561199231694390</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-09-17 21:40</span>
+                </div>
+                <div class="comment-body">пр рп</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199206964399" target="_blank" class="comment-nick">heheess</a>
+                        <span class="mono dim" style="font-size:10px">76561199206964399</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-09-13 02:22</span>
+                </div>
+                <div class="comment-body">пака</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198370374250" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/5b8825b34c5d77b00c3a18897f2f1175fa0e0e57_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198370374250" target="_blank" class="comment-nick">Pego</a>
+                        <span class="mono dim" style="font-size:10px">76561198370374250</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-09-12 20:02</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-nick">AmNum</a>
+                        <span class="mono dim" style="font-size:10px">76561199698759942</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-09-05 15:24</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199513336447" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/97e463a36f2693f6158631fb69c4074694019c20_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199513336447" target="_blank" class="comment-nick">natureboss</a>
+                        <span class="mono dim" style="font-size:10px">76561199513336447</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-31 19:22</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199071567515" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/20b5a0f40f9171e6caea5f5deabcf8822ba03c64_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199071567515" target="_blank" class="comment-nick">Рыба не</a>
+                        <span class="mono dim" style="font-size:10px">76561199071567515</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-31 13:28</span>
+                </div>
+                <div class="comment-body">pr</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199353746526" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/0b2f011136c60ddbd58012073f5dae755c843693_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199353746526" target="_blank" class="comment-nick">Сult of Daxao</a>
+                        <span class="mono dim" style="font-size:10px">76561199353746526</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-30 04:46</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198863459473" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/07bd7cf7f6a024ec1d910b9f3cb1a647bacbd02c_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198863459473" target="_blank" class="comment-nick">Iabsemmelia</a>
+                        <span class="mono dim" style="font-size:10px">76561198863459473</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-28 19:24</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561198994317324" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/6caf9fd33311d78888f1097cff1b447b6708afcc_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561198994317324" target="_blank" class="comment-nick">Arturchik Parkourchik</a>
+                        <span class="mono dim" style="font-size:10px">76561198994317324</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-27 17:10</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199811833899" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/ad49e2fd843b8bd276eef7db0a5b1db447b2be9d_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199811833899" target="_blank" class="comment-nick">Randomshtein</a>
+                        <span class="mono dim" style="font-size:10px">76561199811833899</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-26 22:48</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199698759942" target="_blank" class="comment-nick">AmNum</a>
+                        <span class="mono dim" style="font-size:10px">76561199698759942</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-26 10:55</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199026669453" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/dcce5f1232dfa1c2ff448233398496c6baedf12d_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199026669453" target="_blank" class="comment-nick">[ЧВ] ☭Минотавр☭</a>
+                        <span class="mono dim" style="font-size:10px">76561199026669453</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-24 13:15</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199562431649" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/d48d02585156ad9513051cd897f17c5a7a7f1f68_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199562431649" target="_blank" class="comment-nick">Mar$</a>
+                        <span class="mono dim" style="font-size:10px">76561199562431649</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-22 16:45</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199509533216" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/19dc6654633dbf9b86f8f8f38469e9f42567b276_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199509533216" target="_blank" class="comment-nick">Паучий друг</a>
+                        <span class="mono dim" style="font-size:10px">76561199509533216</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-21 19:14</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199101511059" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/50c1deea138373f4e8b288d6c84fb7081aaada93_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199101511059" target="_blank" class="comment-nick">刀尸口匚丁仈卞丫ㄒ长丹</a>
+                        <span class="mono dim" style="font-size:10px">76561199101511059</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-16 23:34</span>
+                </div>
+                <div class="comment-body">пр</div>
+            </div>
+            <div class="comment-card">
+                <div class="comment-header">
+                    <a href="https://steamcommunity.com/profiles/76561199018462042" target="_blank" class="comment-profile-link"><img src="https://avatars.steamstatic.com/38cf9e490e73491bf1ceef84364b3df1b6db9328_full.jpg" class="comment-ava"></a>
+                    <div class="comment-author">
+                        <a href="https://steamcommunity.com/profiles/76561199018462042" target="_blank" class="comment-nick">rare</a>
+                        <span class="mono dim" style="font-size:10px">76561199018462042</span>
+                    </div>
+                    <span class="mono dim" style="margin-left:auto">2025-08-01 12:27</span>
+                </div>
+                <div class="comment-body">Пр</div>
+            </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ARCHIVE -->
+<div class="page" id="tab-archive">
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-title">Nickname History (402)</div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>Nickname</th><th>Date</th></tr></thead>
+          <tbody><tr><td>rare</td><td class='mono dim'>06.03.2026, 04:46:49</td></tr><tr><td>No one (literally)</td><td class='mono dim'>05.03.2026, 10:20:34</td></tr><tr><td>DRD</td><td class='mono dim'>04.03.2026, 06:36:49</td></tr><tr><td>Rarre</td><td class='mono dim'>02.03.2026, 11:34:07</td></tr><tr><td>linux12</td><td class='mono dim'>01.03.2026, 00:00:04</td></tr><tr><td>БАЛАТРОННЫЙ БАЛА</td><td class='mono dim'>28.02.2026, 05:40:02</td></tr><tr><td>/</td><td class='mono dim'>23.02.2026, 09:40:52</td></tr><tr><td>ДОЗАМАНИЯ #дотадляпидорасов</td><td class='mono dim'>21.02.2026, 10:36:43</td></tr><tr><td>MrDep</td><td class='mono dim'>17.02.2026, 02:46:08</td></tr><tr><td>NeRarre</td><td class='mono dim'>03.02.2026, 09:39:00</td></tr><tr><td>Эпштейн фак нигерс</td><td class='mono dim'>01.02.2026, 17:44:00</td></tr><tr><td>NeRarre</td><td class='mono dim'>24.01.2026, 19:28:00</td></tr><tr><td>Точно не раре</td><td class='mono dim'>23.01.2026, 18:31:00</td></tr><tr><td>axe</td><td class='mono dim'>23.01.2026, 17:39:00</td></tr><tr><td>Точно не раре</td><td class='mono dim'>11.01.2026, 07:50:00</td></tr><tr><td>аыаыауаыа</td><td class='mono dim'>10.01.2026, 12:46:00</td></tr><tr><td>Точно Не Раре</td><td class='mono dim'>10.01.2026, 12:44:00</td></tr><tr><td>Adelekida</td><td class='mono dim'>10.01.2026, 09:32:00</td></tr><tr><td>НиРарре</td><td class='mono dim'>09.01.2026, 17:42:00</td></tr><tr><td>еда арбуз</td><td class='mono dim'>07.01.2026, 12:24:00</td></tr><tr><td>Точно не раре</td><td class='mono dim'>02.01.2026, 15:57:00</td></tr><tr><td>NeRarre</td><td class='mono dim'>12.12.2025, 11:50:00</td></tr><tr><td>NeRarre</td><td class='mono dim'>25.11.2025, 14:52:00</td></tr><tr><td>Rarre</td><td class='mono dim'>09.11.2025, 04:33:00</td></tr><tr><td>Я СИЖУ С НОУТА ПОМОГИТЕ ЖП</td><td class='mono dim'>08.11.2025, 15:37:00</td></tr><tr><td>Supercalifragilisticexpialidocio</td><td class='mono dim'>06.11.2025, 05:25:00</td></tr><tr><td>Rarre</td><td class='mono dim'>26.10.2025, 20:44:00</td></tr><tr><td>Дикий</td><td class='mono dim'>25.10.2025, 15:05:00</td></tr><tr><td>Дикий на хуе игрец</td><td class='mono dim'>25.10.2025, 14:59:00</td></tr><tr><td>Rarre</td><td class='mono dim'>21.10.2025, 10:20:00</td></tr><tr><td>My Nick = JoeW Suck Dick</td><td class='mono dim'>20.10.2025, 14:32:00</td></tr><tr><td>Rarre</td><td class='mono dim'>13.10.2025, 11:35:00</td></tr><tr><td>э</td><td class='mono dim'>10.10.2025, 16:46:00</td></tr><tr><td>Rariтет</td><td class='mono dim'>09.10.2025, 13:12:00</td></tr><tr><td>Rarre</td><td class='mono dim'>03.10.2025, 11:40:00</td></tr><tr><td>Хуисос</td><td class='mono dim'>03.10.2025, 11:34:00</td></tr><tr><td>Взломщэк</td><td class='mono dim'>22.09.2025, 15:21:01</td></tr><tr><td>Rarre</td><td class='mono dim'>21.09.2025, 05:58:20</td></tr><tr><td>Гангеросик</td><td class='mono dim'>20.09.2025, 11:46:22</td></tr><tr><td>Rarre</td><td class='mono dim'>19.09.2025, 17:14:23</td></tr><tr><td>кипр не фек</td><td class='mono dim'>18.09.2025, 22:32:33</td></tr><tr><td>Rarre</td><td class='mono dim'>14.09.2025, 06:44:17</td></tr><tr><td>xyesos</td><td class='mono dim'>13.09.2025, 11:55:25</td></tr><tr><td>Rarre</td><td class='mono dim'>06.09.2025, 20:37:45</td></tr><tr><td>Купил слекснг</td><td class='mono dim'>05.09.2025, 23:07:11</td></tr><tr><td>Тру хадер</td><td class='mono dim'>04.09.2025, 15:23:36</td></tr><tr><td>чинезес</td><td class='mono dim'>02.09.2025, 06:45:18</td></tr><tr><td>Rarre</td><td class='mono dim'>31.08.2025, 01:01:12</td></tr><tr><td>Привет, играй на DST RU ENDLESS,</td><td class='mono dim'>30.08.2025, 11:37:35</td></tr><tr><td>Мраз</td><td class='mono dim'>29.08.2025, 08:46:54</td></tr><tr><td>СНАЧАЛО ИДИ НАХУЙ А ПОТОМ ШЛЕМ</td><td class='mono dim'>28.08.2025, 19:11:14</td></tr><tr><td>稀有的</td><td class='mono dim'>28.08.2025, 05:50:22</td></tr><tr><td>Rarre</td><td class='mono dim'>27.08.2025, 16:28:35</td></tr><tr><td>ПИДАРАСЫ МОЯ ФИШКА</td><td class='mono dim'>27.08.2025, 02:47:49</td></tr><tr><td>Крч иди наху проста окей</td><td class='mono dim'>25.08.2025, 23:41:20</td></tr><tr><td>Пастух</td><td class='mono dim'>25.08.2025, 08:27:48</td></tr><tr><td>Лыжник</td><td class='mono dim'>24.08.2025, 05:25:18</td></tr><tr><td>ezezez</td><td class='mono dim'>23.08.2025, 16:04:08</td></tr><tr><td>Rarre</td><td class='mono dim'>21.08.2025, 23:43:45</td></tr><tr><td>ez</td><td class='mono dim'>19.08.2025, 17:49:41</td></tr><tr><td>Rarre #ПофикситеУголь</td><td class='mono dim'>18.08.2025, 01:35:19</td></tr><tr><td>PussyDestroyer69</td><td class='mono dim'>17.08.2025, 12:14:05</td></tr><tr><td>Man man man</td><td class='mono dim'>15.08.2025, 06:07:58</td></tr><tr><td>Чинезе шифровка!</td><td class='mono dim'>14.08.2025, 16:11:29</td></tr><tr><td>็</td><td class='mono dim'>14.08.2025, 02:45:56</td></tr><tr><td>Rarre #ПофикситеУголь</td><td class='mono dim'>12.08.2025, 23:56:02</td></tr><tr><td>Rarre</td><td class='mono dim'>06.08.2025, 05:14:19</td></tr><tr><td>sasa</td><td class='mono dim'>05.08.2025, 00:00:15</td></tr><tr><td>дикий кукуруз</td><td class='mono dim'>03.08.2025, 19:46:53</td></tr><tr><td>therewasasassyguy</td><td class='mono dim'>29.07.2025, 14:04:16</td></tr><tr><td>Rarre</td><td class='mono dim'>27.07.2025, 08:00:55</td></tr><tr><td>О сасiсkе</td><td class='mono dim'>26.07.2025, 18:17:47</td></tr><tr><td>Rarre</td><td class='mono dim'>24.07.2025, 11:40:33</td></tr><tr><td>marcel</td><td class='mono dim'>23.07.2025, 08:42:19</td></tr><tr><td>Камбэк за вуди</td><td class='mono dim'>21.07.2025, 21:26:19</td></tr><tr><td>Rarre</td><td class='mono dim'>17.07.2025, 01:39:39</td></tr><tr><td>fgjakgfajkfajkfajfaf</td><td class='mono dim'>16.07.2025, 06:19:51</td></tr><tr><td>bonfraer</td><td class='mono dim'>15.07.2025, 08:05:08</td></tr><tr><td>IndeedSummer</td><td class='mono dim'>10.07.2025, 18:53:53</td></tr><tr><td>Allison</td><td class='mono dim'>09.07.2025, 02:52:46</td></tr><tr><td>Rarre</td><td class='mono dim'>06.07.2025, 14:09:56</td></tr><tr><td>Луны Попуск</td><td class='mono dim'>04.07.2025, 21:57:45</td></tr><tr><td>Rarre Trakhtenberg</td><td class='mono dim'>03.07.2025, 19:12:14</td></tr><tr><td>Rarre</td><td class='mono dim'>02.07.2025, 01:10:15</td></tr><tr><td>Сет колаур)))</td><td class='mono dim'>01.07.2025, 03:49:17</td></tr><tr><td>Svaston</td><td class='mono dim'>30.06.2025, 03:45:16</td></tr><tr><td>Ml❤</td><td class='mono dim'>26.06.2025, 14:38:04</td></tr><tr><td>Fd</td><td class='mono dim'>21.06.2025, 00:58:36</td></tr><tr><td>Electroely</td><td class='mono dim'>16.06.2025, 17:15:41</td></tr><tr><td>Леди с колбасой</td><td class='mono dim'>14.06.2025, 15:43:38</td></tr><tr><td>Rarre</td><td class='mono dim'>24.05.2025, 23:19:40</td></tr><tr><td>Никчемых ныд даедаешь блядм</td><td class='mono dim'>19.05.2025, 21:37:07</td></tr><tr><td>Никчемых ныд даедаешь блядм</td><td class='mono dim'>19.05.2025, 04:52:14</td></tr><tr><td>a</td><td class='mono dim'>12.05.2025, 02:38:59</td></tr><tr><td>Duolingo</td><td class='mono dim'>07.05.2025, 21:16:55</td></tr><tr><td>дуалинга павер</td><td class='mono dim'>05.05.2025, 19:01:35</td></tr><tr><td>фука йобаны дуалинга</td><td class='mono dim'>04.05.2025, 23:20:24</td></tr><tr><td>фука йобаны дуалинга</td><td class='mono dim'>04.05.2025, 06:57:35</td></tr><tr><td>[HOT] я и есть савеля</td><td class='mono dim'>03.05.2025, 13:17:51</td></tr><tr><td>Ezka</td><td class='mono dim'>02.05.2025, 08:47:30</td></tr><tr><td>IndeedWinter</td><td class='mono dim'>25.04.2025, 02:02:33</td></tr><tr><td>Rarre</td><td class='mono dim'>23.04.2025, 23:48:43</td></tr><tr><td>Pidoryato</td><td class='mono dim'>21.04.2025, 12:47:21</td></tr><tr><td>Chinawell</td><td class='mono dim'>15.04.2025, 18:38:40</td></tr><tr><td>ЗАВЛАДЕЛ СИЛОЙ 3 ГРИБОВ</td><td class='mono dim'>10.04.2025, 12:46:14</td></tr><tr><td>51 автобус шалава</td><td class='mono dim'>09.04.2025, 17:11:30</td></tr><tr><td>клевинс</td><td class='mono dim'>09.04.2025, 00:07:44</td></tr><tr><td>рарегитлер</td><td class='mono dim'>06.04.2025, 06:16:56</td></tr><tr><td>живодёр</td><td class='mono dim'>31.03.2025, 00:08:58</td></tr><tr><td>живодёр</td><td class='mono dim'>30.03.2025, 06:35:54</td></tr><tr><td>Ваzя</td><td class='mono dim'>22.03.2025, 04:17:45</td></tr><tr><td>Rarre</td><td class='mono dim'>20.03.2025, 08:21:29</td></tr><tr><td>бубубу</td><td class='mono dim'>18.03.2025, 22:34:01</td></tr><tr><td>11berkant11</td><td class='mono dim'>18.03.2025, 05:42:39</td></tr><tr><td>фантик</td><td class='mono dim'>15.03.2025, 05:11:17</td></tr><tr><td>(Zli) [TaKe?] Rarre</td><td class='mono dim'>14.03.2025, 09:33:59</td></tr><tr><td>(Zli) [TaKe?] [Br] (69) Rarre</td><td class='mono dim'>12.03.2025, 23:40:16</td></tr><tr><td>Kot</td><td class='mono dim'>12.03.2025, 06:07:35</td></tr><tr><td>рари</td><td class='mono dim'>10.03.2025, 19:54:34</td></tr><tr><td>хуисос</td><td class='mono dim'>10.03.2025, 01:57:12</td></tr><tr><td>Rarre</td><td class='mono dim'>09.03.2025, 08:46:11</td></tr><tr><td>маяковский лох</td><td class='mono dim'>08.03.2025, 15:56:45</td></tr><tr><td>Rarre</td><td class='mono dim'>07.03.2025, 07:20:57</td></tr><tr><td>24 гнили</td><td class='mono dim'>06.03.2025, 04:02:54</td></tr><tr><td>!крабик</td><td class='mono dim'>05.03.2025, 11:59:22</td></tr><tr><td>24 гнили</td><td class='mono dim'>02.03.2025, 19:53:06</td></tr><tr><td>rarre'</td><td class='mono dim'>26.02.2025, 14:20:07</td></tr><tr><td>(Zli) [TaKe?] rarre' расульчик))</td><td class='mono dim'>25.02.2025, 17:39:10</td></tr><tr><td>rarre'</td><td class='mono dim'>24.02.2025, 13:06:53</td></tr><tr><td>(Zli) rarre'</td><td class='mono dim'>22.02.2025, 07:27:48</td></tr><tr><td>rarre'</td><td class='mono dim'>21.02.2025, 06:06:59</td></tr><tr><td>Rarre</td><td class='mono dim'>13.02.2025, 19:20:22</td></tr><tr><td>(Zli) раре расульчик))))))))</td><td class='mono dim'>11.02.2025, 02:42:51</td></tr><tr><td>РАРИ УМРИ</td><td class='mono dim'>09.02.2025, 03:53:14</td></tr><tr><td>Дурачок228</td><td class='mono dim'>06.02.2025, 01:22:49</td></tr><tr><td>прадед дурачка228</td><td class='mono dim'>04.02.2025, 06:43:30</td></tr><tr><td>ЗЛИ ДСТ</td><td class='mono dim'>03.02.2025, 10:23:23</td></tr><tr><td>米莎天花板</td><td class='mono dim'>30.01.2025, 02:13:09</td></tr><tr><td>Миша Потолки</td><td class='mono dim'>28.01.2025, 12:55:37</td></tr><tr><td>The Global</td><td class='mono dim'>12.01.2025, 11:49:38</td></tr><tr><td>Rare pon</td><td class='mono dim'>11.01.2025, 17:59:40</td></tr><tr><td>дидибудидбдаубдуа</td><td class='mono dim'>11.01.2025, 00:59:55</td></tr><tr><td>фижма</td><td class='mono dim'>09.01.2025, 08:06:06</td></tr><tr><td>Rare pon</td><td class='mono dim'>08.01.2025, 19:22:28</td></tr><tr><td>Rhombictruncatedicosodecahedron</td><td class='mono dim'>03.01.2025, 09:20:39</td></tr><tr><td>rhomboicosidodecahedron</td><td class='mono dim'>02.01.2025, 13:52:05</td></tr><tr><td>кто такой</td><td class='mono dim'>01.01.2025, 00:30:48</td></tr><tr><td>Pidoras</td><td class='mono dim'>29.12.2024, 13:27:07</td></tr><tr><td>Брах карлос</td><td class='mono dim'>16.12.2024, 04:10:39</td></tr><tr><td>Juan Carlos</td><td class='mono dim'>12.11.2024, 22:35:20</td></tr><tr><td>макар макак</td><td class='mono dim'>31.10.2024, 04:08:29</td></tr><tr><td>Что нибудь ещё?</td><td class='mono dim'>23.10.2024, 16:36:37</td></tr><tr><td>🧟‍♂</td><td class='mono dim'>29.09.2024, 21:33:12</td></tr><tr><td>апаснинка</td><td class='mono dim'>14.09.2024, 12:06:41</td></tr><tr><td>jopaMany = true;</td><td class='mono dim'>01.09.2024, 17:15:27</td></tr><tr><td>мирный хуебес</td><td class='mono dim'>29.08.2024, 17:36:12</td></tr><tr><td>Rareee</td><td class='mono dim'>25.08.2024, 11:39:28</td></tr><tr><td>квадробер</td><td class='mono dim'>24.08.2024, 01:37:24</td></tr><tr><td>кто не против</td><td class='mono dim'>21.08.2024, 16:51:06</td></tr><tr><td>потато</td><td class='mono dim'>27.07.2024, 19:05:30</td></tr><tr><td>лехкий воин</td><td class='mono dim'>25.07.2024, 18:21:24</td></tr><tr><td>умер</td><td class='mono dim'>19.07.2024, 02:28:39</td></tr><tr><td>чё</td><td class='mono dim'>01.07.2024, 12:36:00</td></tr><tr><td>аноун</td><td class='mono dim'>30.06.2024, 08:22:20</td></tr><tr><td>зигующая нерпа</td><td class='mono dim'>18.06.2024, 18:55:23</td></tr><tr><td>тапаю тапаю тапаю</td><td class='mono dim'>13.06.2024, 02:36:02</td></tr><tr><td>кофемолка</td><td class='mono dim'>10.06.2024, 23:24:27</td></tr><tr><td>Rare</td><td class='mono dim'>08.06.2024, 18:41:45</td></tr><tr><td>PoshPoro1</td><td class='mono dim'>29.05.2024, 20:15:46</td></tr><tr><td>АААААААААА ППТУАТУ</td><td class='mono dim'>28.05.2024, 20:00:07</td></tr><tr><td>чёрт вортокс</td><td class='mono dim'>25.05.2024, 19:20:06</td></tr><tr><td>D+D+D+D+D+D+D+D+D+D+D+D</td><td class='mono dim'>20.05.2024, 19:49:58</td></tr><tr><td>Floptrix</td><td class='mono dim'>09.05.2024, 15:52:26</td></tr><tr><td>Da</td><td class='mono dim'>07.05.2024, 23:02:28</td></tr><tr><td>Сильный кот</td><td class='mono dim'>30.04.2024, 18:22:42</td></tr><tr><td>Раре да</td><td class='mono dim'>27.04.2024, 19:55:21</td></tr><tr><td>>:(</td><td class='mono dim'>24.04.2024, 02:17:33</td></tr><tr><td>Харёк в тыкве</td><td class='mono dim'>21.04.2024, 09:16:00</td></tr><tr><td><-- я</td><td class='mono dim'>18.04.2024, 15:54:42</td></tr><tr><td>abrikosi</td><td class='mono dim'>11.04.2024, 22:57:25</td></tr><tr><td>Армян связи</td><td class='mono dim'>10.04.2024, 14:55:30</td></tr><tr><td>rizz power</td><td class='mono dim'>09.04.2024, 22:18:00</td></tr><tr><td>kolbix</td><td class='mono dim'>08.04.2024, 22:02:35</td></tr><tr><td>Джон Кеннеди</td><td class='mono dim'>06.04.2024, 19:42:08</td></tr><tr><td>Саша Владимирович</td><td class='mono dim'>06.04.2024, 03:22:39</td></tr><tr><td>Лилия Мстиславна</td><td class='mono dim'>04.04.2024, 18:01:41</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>31.03.2024, 01:13:07</td></tr><tr><td>лп ГлюкА</td><td class='mono dim'>28.03.2024, 11:06:21</td></tr><tr><td>деман котов</td><td class='mono dim'>27.03.2024, 14:47:50</td></tr><tr><td>76561199018462042</td><td class='mono dim'>20.03.2024, 03:09:44</td></tr><tr><td>шкибиде титан спикемен</td><td class='mono dim'>19.03.2024, 07:20:38</td></tr><tr><td>Жаропрочный кот</td><td class='mono dim'>14.03.2024, 08:35:36</td></tr><tr><td>mega sigma pro cat</td><td class='mono dim'>12.03.2024, 21:00:42</td></tr><tr><td>Ядерный пожиратель галактики󰀒</td><td class='mono dim'>10.03.2024, 11:04:33</td></tr><tr><td>󰀒 alexa.vesna 󰀒</td><td class='mono dim'>09.03.2024, 21:22:50</td></tr><tr><td>strawberry cat</td><td class='mono dim'>04.03.2024, 01:33:01</td></tr><tr><td>evil watermelon cat</td><td class='mono dim'>03.03.2024, 03:26:28</td></tr><tr><td>watermelon w1knd*</td><td class='mono dim'>27.02.2024, 05:03:57</td></tr><tr><td>watermelon misha</td><td class='mono dim'>26.02.2024, 15:20:22</td></tr><tr><td>шкибиди миша</td><td class='mono dim'>23.02.2024, 19:55:25</td></tr><tr><td>мишаприв</td><td class='mono dim'>16.02.2024, 08:02:51</td></tr><tr><td>tm</td><td class='mono dim'>13.02.2024, 07:14:37</td></tr><tr><td>very sus</td><td class='mono dim'>10.02.2024, 04:57:31</td></tr><tr><td>СТААЯТЬ КОВБОЙ</td><td class='mono dim'>08.02.2024, 05:56:55</td></tr><tr><td>yshas</td><td class='mono dim'>06.02.2024, 00:20:24</td></tr><tr><td>@#sus#@</td><td class='mono dim'>03.02.2024, 18:07:04</td></tr><tr><td>bad cop 👮</td><td class='mono dim'>03.02.2024, 04:34:05</td></tr><tr><td>миша про бс</td><td class='mono dim'>01.02.2024, 20:24:46</td></tr><tr><td>шкибиди кид</td><td class='mono dim'>01.02.2024, 01:13:06</td></tr><tr><td>󰀒 alexa.vesna 󰀒</td><td class='mono dim'>30.01.2024, 23:14:37</td></tr><tr><td>Smirk cat😼</td><td class='mono dim'>30.01.2024, 04:09:50</td></tr><tr><td>Malaya228</td><td class='mono dim'>29.01.2024, 09:05:22</td></tr><tr><td>деман агня</td><td class='mono dim'>27.01.2024, 04:17:45</td></tr><tr><td>я падаю бля</td><td class='mono dim'>26.01.2024, 09:40:06</td></tr><tr><td>МандариН</td><td class='mono dim'>24.01.2024, 11:05:05</td></tr><tr><td>арбуз</td><td class='mono dim'>23.01.2024, 18:19:40</td></tr><tr><td>w1knd*</td><td class='mono dim'>22.01.2024, 02:04:35</td></tr><tr><td>лп ГлюКа</td><td class='mono dim'>19.01.2024, 22:35:10</td></tr><tr><td>Kitomraz</td><td class='mono dim'>19.01.2024, 10:50:20</td></tr><tr><td>STAS</td><td class='mono dim'>18.01.2024, 23:47:05</td></tr><tr><td>Орех в тыкве</td><td class='mono dim'>18.01.2024, 07:10:21</td></tr><tr><td>Eugene Freeman</td><td class='mono dim'>17.01.2024, 20:05:39</td></tr><tr><td>Демомем</td><td class='mono dim'>17.01.2024, 05:46:36</td></tr><tr><td>@#sus#@</td><td class='mono dim'>15.01.2024, 08:18:55</td></tr><tr><td>Rare pon</td><td class='mono dim'>12.01.2024, 11:24:25</td></tr><tr><td>Стас Г.[Br]</td><td class='mono dim'>10.01.2024, 03:07:52</td></tr><tr><td>Стасик Юн[Br]</td><td class='mono dim'>09.01.2024, 09:33:23</td></tr><tr><td>Стасик Юн</td><td class='mono dim'>06.01.2024, 21:43:43</td></tr><tr><td>Дмитрий Григориев</td><td class='mono dim'>05.01.2024, 20:15:09</td></tr><tr><td>Cherniy Kot</td><td class='mono dim'>05.01.2024, 03:19:30</td></tr><tr><td>Pon4ik</td><td class='mono dim'>04.01.2024, 01:50:11</td></tr><tr><td>Pon4ik[Br]</td><td class='mono dim'>03.01.2024, 07:30:16</td></tr><tr><td>Pon4ik[mit]</td><td class='mono dim'>02.01.2024, 05:17:57</td></tr><tr><td>Rare pon</td><td class='mono dim'>28.12.2023, 23:19:18</td></tr><tr><td>ВыплюнулЗолотойГоршок</td><td class='mono dim'>26.12.2023, 17:53:32</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>23.12.2023, 20:03:48</td></tr><tr><td>shut up high rank</td><td class='mono dim'>23.12.2023, 03:27:50</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>22.12.2023, 01:06:32</td></tr><tr><td>dayn</td><td class='mono dim'>20.12.2023, 19:38:15</td></tr><tr><td>Лилия Станиславовна</td><td class='mono dim'>19.12.2023, 21:50:06</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>19.12.2023, 01:26:50</td></tr><tr><td>Лилия Станиславовна</td><td class='mono dim'>16.12.2023, 02:42:03</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>11.12.2023, 09:22:55</td></tr><tr><td>мэрсэдэс нахуй</td><td class='mono dim'>10.12.2023, 11:36:48</td></tr><tr><td>Стас Дмитриев</td><td class='mono dim'>07.12.2023, 21:21:20</td></tr><tr><td>Rare rom pom pom</td><td class='mono dim'>06.12.2023, 18:55:07</td></tr><tr><td>:skull: 󰀕</td><td class='mono dim'>04.12.2023, 23:08:41</td></tr><tr><td>Legit not trash</td><td class='mono dim'>04.12.2023, 05:51:20</td></tr><tr><td>>:(</td><td class='mono dim'>26.11.2023, 21:13:24</td></tr><tr><td>Pidorariik</td><td class='mono dim'>26.11.2023, 04:50:15</td></tr><tr><td>дипанс ван</td><td class='mono dim'>23.11.2023, 01:14:00</td></tr><tr><td>CHEATER TRASH</td><td class='mono dim'>21.11.2023, 23:52:57</td></tr><tr><td>Dworf Engeener</td><td class='mono dim'>21.11.2023, 07:30:52</td></tr><tr><td>Nuh uh !</td><td class='mono dim'>19.11.2023, 15:36:06</td></tr><tr><td>💔 is ❤️‍🩹</td><td class='mono dim'>18.11.2023, 14:29:29</td></tr><tr><td>.Rar</td><td class='mono dim'>17.11.2023, 15:55:21</td></tr><tr><td>#боюсьпробелов</td><td class='mono dim'>16.11.2023, 23:28:53</td></tr><tr><td>брух брух</td><td class='mono dim'>16.11.2023, 06:25:19</td></tr><tr><td>о тымен</td><td class='mono dim'>14.11.2023, 20:36:11</td></tr><tr><td>спикимен</td><td class='mono dim'>13.11.2023, 06:24:58</td></tr><tr><td>Курседенок</td><td class='mono dim'>12.11.2023, 13:50:06</td></tr><tr><td>Napoleon</td><td class='mono dim'>10.11.2023, 04:08:34</td></tr><tr><td>дёд инсойд</td><td class='mono dim'>09.11.2023, 11:33:51</td></tr><tr><td>НЕЩАБУДУ</td><td class='mono dim'>08.11.2023, 19:24:07</td></tr><tr><td>Циркулял</td><td class='mono dim'>07.11.2023, 02:23:19</td></tr><tr><td>Купи мне семечки ром пом пом</td><td class='mono dim'>05.11.2023, 18:04:15</td></tr><tr><td>ГлюК</td><td class='mono dim'>02.11.2023, 08:00:31</td></tr><tr><td>GroznijGlyk2002</td><td class='mono dim'>30.10.2023, 22:18:14</td></tr><tr><td>burp</td><td class='mono dim'>30.10.2023, 05:54:27</td></tr><tr><td>GroznijGlyk2002</td><td class='mono dim'>29.10.2023, 13:30:33</td></tr><tr><td>fucker of Rare</td><td class='mono dim'>28.10.2023, 20:47:04</td></tr><tr><td>rgr</td><td class='mono dim'>27.10.2023, 19:47:02</td></tr><tr><td>Армян РарЕ</td><td class='mono dim'>26.10.2023, 19:31:32</td></tr><tr><td>More go district</td><td class='mono dim'>23.10.2023, 21:37:13</td></tr><tr><td>Tee世界</td><td class='mono dim'>22.10.2023, 05:00:22</td></tr><tr><td>obyvb世界</td><td class='mono dim'>16.10.2023, 20:15:56</td></tr><tr><td>spivak</td><td class='mono dim'>16.10.2023, 01:38:48</td></tr><tr><td>тиктокерша настя</td><td class='mono dim'>13.10.2023, 19:23:52</td></tr><tr><td>Schweppes guys</td><td class='mono dim'>09.10.2023, 18:15:32</td></tr><tr><td>shweps</td><td class='mono dim'>06.10.2023, 03:28:39</td></tr><tr><td>guys</td><td class='mono dim'>30.09.2023, 22:53:56</td></tr><tr><td>my last nickname</td><td class='mono dim'>28.09.2023, 18:56:39</td></tr><tr><td>CONTROL!</td><td class='mono dim'>26.09.2023, 13:18:26</td></tr><tr><td>-Курение</td><td class='mono dim'>22.09.2023, 16:10:43</td></tr><tr><td>Smurf cat</td><td class='mono dim'>21.09.2023, 04:26:51</td></tr><tr><td>Win10 (C:)</td><td class='mono dim'>17.09.2023, 23:46:20</td></tr><tr><td>кокмок</td><td class='mono dim'>16.09.2023, 08:03:41</td></tr><tr><td>не</td><td class='mono dim'>15.09.2023, 17:10:27</td></tr><tr><td>я победюmjzbn</td><td class='mono dim'>15.09.2023, 02:33:55</td></tr><tr><td>14161616161381</td><td class='mono dim'>13.09.2023, 12:41:17</td></tr><tr><td>Сан хуйан</td><td class='mono dim'>12.09.2023, 10:00:55</td></tr><tr><td>Ctac Dmitriev</td><td class='mono dim'>11.09.2023, 09:42:32</td></tr><tr><td>Стас дмитриев</td><td class='mono dim'>09.09.2023, 18:27:35</td></tr><tr><td>Dark_lightest</td><td class='mono dim'>09.09.2023, 05:09:42</td></tr><tr><td>Dummу</td><td class='mono dim'>08.09.2023, 02:24:57</td></tr><tr><td>ebanulsa?</td><td class='mono dim'>05.09.2023, 00:28:43</td></tr><tr><td>daaaa</td><td class='mono dim'>02.09.2023, 19:16:50</td></tr><tr><td>ми анд май манки</td><td class='mono dim'>01.09.2023, 16:51:57</td></tr><tr><td>робуксы ни дают за паркур в робо</td><td class='mono dim'>01.09.2023, 03:05:58</td></tr><tr><td>я побeдю</td><td class='mono dim'>31.08.2023, 13:52:31</td></tr><tr><td>я победю</td><td class='mono dim'>31.08.2023, 00:41:03</td></tr><tr><td>Rare</td><td class='mono dim'>29.08.2023, 18:50:09</td></tr><tr><td>я победю</td><td class='mono dim'>28.08.2023, 10:19:49</td></tr><tr><td>to4no true rare</td><td class='mono dim'>27.08.2023, 00:24:44</td></tr><tr><td>Maybe run to Tashanta?</td><td class='mono dim'>26.08.2023, 05:45:44</td></tr><tr><td>Maybe run?</td><td class='mono dim'>24.08.2023, 14:29:07</td></tr><tr><td>BOOM BOOM TO TOSHANT</td><td class='mono dim'>23.08.2023, 21:50:38</td></tr><tr><td>Royal Canin</td><td class='mono dim'>21.08.2023, 05:23:06</td></tr><tr><td>Дурачок 228</td><td class='mono dim'>19.08.2023, 09:23:46</td></tr><tr><td>™рари</td><td class='mono dim'>18.08.2023, 20:04:23</td></tr><tr><td>GrafProstata</td><td class='mono dim'>18.08.2023, 06:03:02</td></tr><tr><td>Rare</td><td class='mono dim'>15.08.2023, 10:02:54</td></tr><tr><td>Rare in my dream</td><td class='mono dim'>12.08.2023, 06:05:17</td></tr><tr><td>колобок на мефедроне под каким-т</td><td class='mono dim'>11.08.2023, 10:20:51</td></tr><tr><td>эээээ</td><td class='mono dim'>10.08.2023, 17:38:49</td></tr><tr><td>Девственник</td><td class='mono dim'>10.08.2023, 02:39:29</td></tr><tr><td>Артем гомодрилов</td><td class='mono dim'>09.08.2023, 08:33:03</td></tr><tr><td>Андрей зигомет</td><td class='mono dim'>08.08.2023, 03:11:13</td></tr><tr><td>Стас дмитриев</td><td class='mono dim'>06.08.2023, 20:21:54</td></tr><tr><td>Shadowskiy</td><td class='mono dim'>05.08.2023, 19:55:52</td></tr><tr><td>Стас дмитриев</td><td class='mono dim'>04.08.2023, 21:45:51</td></tr><tr><td>Rare</td><td class='mono dim'>03.08.2023, 16:30:12</td></tr><tr><td>True Rare</td><td class='mono dim'>02.08.2023, 05:19:24</td></tr><tr><td>мастур бист</td><td class='mono dim'>01.08.2023, 18:44:28</td></tr><tr><td>Rare pon</td><td class='mono dim'>01.08.2023, 13:53:59</td></tr><tr><td>рари тирари</td><td class='mono dim'>30.07.2023, 18:29:06</td></tr><tr><td>я зол</td><td class='mono dim'>29.07.2023, 15:57:23</td></tr><tr><td>бумбая</td><td class='mono dim'>27.07.2023, 14:20:45</td></tr><tr><td>рари тирари</td><td class='mono dim'>27.07.2023, 09:10:57</td></tr><tr><td>хейтер золотой картошки</td><td class='mono dim'>26.07.2023, 22:35:31</td></tr><tr><td>промазал по лотку</td><td class='mono dim'>23.07.2023, 17:46:29</td></tr><tr><td>Wor tax</td><td class='mono dim'>23.07.2023, 03:56:57</td></tr><tr><td>?</td><td class='mono dim'>21.07.2023, 23:00:41</td></tr><tr><td>Макар великий</td><td class='mono dim'>21.07.2023, 18:11:33</td></tr><tr><td>Avatar didn't load...</td><td class='mono dim'>21.07.2023, 13:20:57</td></tr><tr><td>󰀒 stiva.leto 󰀒</td><td class='mono dim'>21.07.2023, 03:41:55</td></tr><tr><td>Avatar didn't load.</td><td class='mono dim'>12.07.2023, 16:10:20</td></tr><tr><td>did you order pizza?:></td><td class='mono dim'>10.07.2023, 11:36:12</td></tr><tr><td>Rare?</td><td class='mono dim'>06.07.2023, 00:43:30</td></tr><tr><td>Semga?</td><td class='mono dim'>28.06.2023, 22:52:56</td></tr><tr><td>сёмга</td><td class='mono dim'>25.06.2023, 23:39:17</td></tr><tr><td>ГлюК</td><td class='mono dim'>24.06.2023, 23:03:49</td></tr><tr><td>Твинк глюка</td><td class='mono dim'>22.06.2023, 20:02:41</td></tr><tr><td>Common</td><td class='mono dim'>22.06.2023, 14:58:55</td></tr><tr><td>Арсений кубань</td><td class='mono dim'>22.06.2023, 04:15:58</td></tr><tr><td>рари фирари</td><td class='mono dim'>21.06.2023, 06:44:52</td></tr><tr><td>Rare pon</td><td class='mono dim'>17.06.2023, 11:55:57</td></tr><tr><td>Rare pon</td><td class='mono dim'>17.06.2023, 07:04:37</td></tr><tr><td>Rare</td><td class='mono dim'>14.06.2023, 21:12:45</td></tr><tr><td>улетеле</td><td class='mono dim'>14.06.2023, 16:01:25</td></tr><tr><td>Memory</td><td class='mono dim'>13.06.2023, 20:21:33</td></tr><tr><td>Rare</td><td class='mono dim'>10.06.2023, 01:23:21</td></tr><tr><td>󰀁Миша подвалы󰀁</td><td class='mono dim'>05.06.2023, 16:05:04</td></tr><tr><td>󰀁Миша падвалы󰀁</td><td class='mono dim'>03.06.2023, 19:22:00</td></tr><tr><td>Terrors Below</td><td class='mono dim'>02.06.2023, 04:45:10</td></tr><tr><td>󰀍</td><td class='mono dim'>01.06.2023, 23:42:27</td></tr><tr><td>󰀍дотер плей</td><td class='mono dim'>01.06.2023, 12:46:42</td></tr><tr><td>󰀍everydayimwortox󰀍</td><td class='mono dim'>29.05.2023, 19:26:08</td></tr><tr><td>󰀍Андрей 6511󰀍</td><td class='mono dim'>29.05.2023, 05:02:34</td></tr><tr><td>󰀍Another Wortox󰀍</td><td class='mono dim'>28.05.2023, 02:00:23</td></tr><tr><td>Rare</td><td class='mono dim'>27.05.2023, 14:50:49</td></tr><tr><td>трутень ебало ноль^)</td><td class='mono dim'>26.05.2023, 16:54:21</td></tr><tr><td>Raree^)</td><td class='mono dim'>20.05.2023, 18:15:50</td></tr><tr><td>Тот самый дурачок 228</td><td class='mono dim'>20.05.2023, 05:55:00</td></tr><tr><td>рари пон</td><td class='mono dim'>17.05.2023, 18:27:31</td></tr><tr><td>KoBrit</td><td class='mono dim'>16.05.2023, 14:09:58</td></tr><tr><td>Ладно.</td><td class='mono dim'>16.05.2023, 01:37:37</td></tr><tr><td>[0B] Ведро таза</td><td class='mono dim'>15.05.2023, 00:36:17</td></tr><tr><td>[OB] Потолки Миша</td><td class='mono dim'>14.05.2023, 14:31:59</td></tr><tr><td>[OB] blyat rari</td><td class='mono dim'>14.05.2023, 04:34:57</td></tr><tr><td>[OB]Royal Canin</td><td class='mono dim'>12.05.2023, 17:33:33</td></tr><tr><td>Royal Canin</td><td class='mono dim'>11.05.2023, 21:53:52</td></tr><tr><td>Роял канин</td><td class='mono dim'>10.05.2023, 01:20:38</td></tr><tr><td>󰀜Long Raree󰀜</td><td class='mono dim'>08.05.2023, 03:09:02</td></tr><tr><td>Rare pon?</td><td class='mono dim'>06.05.2023, 21:52:15</td></tr><tr><td>rare</td><td class='mono dim'>04.05.2023, 19:05:26</td></tr><tr><td>Raight</td><td class='mono dim'>30.04.2023, 16:20:49</td></tr><tr><td>pon</td><td class='mono dim'>27.04.2023, 06:04:17</td></tr><tr><td>Holiday Rare:></td><td class='mono dim'>26.04.2023, 05:27:33</td></tr><tr><td>Специфический</td><td class='mono dim'>25.04.2023, 15:53:58</td></tr><tr><td>Гендеронеопределенный</td><td class='mono dim'>25.04.2023, 01:12:48</td></tr><tr><td>Андрей 8000</td><td class='mono dim'>24.04.2023, 21:38:27</td></tr><tr><td>Потолки Миша</td><td class='mono dim'>21.04.2023, 06:44:45</td></tr><tr><td>Egg</td><td class='mono dim'>19.04.2023, 20:38:13</td></tr><tr><td>Melon</td><td class='mono dim'>18.04.2023, 21:27:40</td></tr><tr><td>Icelemon</td><td class='mono dim'>18.04.2023, 00:35:53</td></tr><tr><td>дыня</td><td class='mono dim'>14.04.2023, 00:29:54</td></tr><tr><td>раре пил</td><td class='mono dim'>12.04.2023, 23:52:02</td></tr><tr><td>♫Папе рил♫</td><td class='mono dim'>11.04.2023, 16:00:48</td></tr><tr><td>♫Rare♫</td><td class='mono dim'>11.04.2023, 01:39:12</td></tr><tr><td>♫цунами♫</td><td class='mono dim'>10.04.2023, 20:25:04</td></tr><tr><td>♫японский сапромох♫</td><td class='mono dim'>10.04.2023, 06:09:08</td></tr><tr><td>♫редкий♫</td><td class='mono dim'>09.04.2023, 16:16:55</td></tr><tr><td>хроматический</td><td class='mono dim'>08.04.2023, 20:21:44</td></tr><tr><td>Великий Хан</td><td class='mono dim'>07.04.2023, 16:34:18</td></tr><tr><td>󰀀Rare󰀀</td><td class='mono dim'>02.04.2023, 01:13:09</td></tr><tr><td>Rare</td><td class='mono dim'>27.03.2023, 03:10:28</td></tr><tr><td>Выблядок</td><td class='mono dim'>27.03.2023, 02:31:37</td></tr><tr><td>пидрила</td><td class='mono dim'>25.03.2023, 04:40:33</td></tr><tr><td>Rare 45#1097</td><td class='mono dim'>16.03.2023, 13:34:35</td></tr><tr><td>Scraft#1097</td><td class='mono dim'>16.03.2023, 03:01:32</td></tr><tr><td>Scrhaft</td><td class='mono dim'>16.03.2023, 02:57:58</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Real Name History (19)</div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>Real Name</th><th>Date</th></tr></thead>
+          <tbody><tr><td>doom</td><td class='mono dim'>23.08.2025, 16:04:08</td></tr><tr><td>n</td><td class='mono dim'>24.07.2025, 11:40:33</td></tr><tr><td>Rarre</td><td class='mono dim'>06.07.2025, 14:09:56</td></tr><tr><td>AKA Mr.Rare</td><td class='mono dim'>31.01.2024, 12:14:30</td></tr><tr><td>−−  −−−  ·−·  ·· ·−</td><td class='mono dim'>10.01.2024, 20:53:16</td></tr><tr><td>moriya</td><td class='mono dim'>01.01.2024, 10:37:41</td></tr><tr><td>Cago</td><td class='mono dim'>28.11.2023, 04:38:26</td></tr><tr><td>А у меня снег выпал в ноябре хпхпха</td><td class='mono dim'>20.11.2023, 16:13:30</td></tr><tr><td>suck it up</td><td class='mono dim'>11.11.2023, 21:00:37</td></tr><tr><td>suck it up</td><td class='mono dim'>09.10.2023, 18:15:32</td></tr><tr><td>вычопоухеевалибляятьвычеебнутые?</td><td class='mono dim'>24.08.2023, 14:29:07</td></tr><tr><td>вычопоухеевалибляятьвычеебнутые</td><td class='mono dim'>11.07.2023, 02:50:10</td></tr><tr><td>dst idi naxyi</td><td class='mono dim'>06.07.2023, 21:40:26</td></tr><tr><td>Wortox forever</td><td class='mono dim'>16.06.2023, 14:25:46</td></tr><tr><td>Вортокс мейн/спидранер/пвпшер</td><td class='mono dim'>15.06.2023, 21:10:45</td></tr><tr><td>Вортокс мейн/спидранер/пвпшер</td><td class='mono dim'>15.05.2023, 15:38:12</td></tr><tr><td>It's just a prank, Raree:)</td><td class='mono dim'>28.04.2023, 02:58:17</td></tr><tr><td>скрафт</td><td class='mono dim'>09.04.2023, 04:18:28</td></tr><tr><td>скрафт</td><td class='mono dim'>01.04.2023, 15:30:07</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div class="panel">
+      <div class="panel-title">URL History (9)</div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>URL</th><th>Date</th></tr></thead>
+          <tbody><tr><td>id/zlidst</td><td class='mono dim'>07.03.2026, 00:22:17</td></tr><tr><td>id/dobridst</td><td class='mono dim'>03.01.2026, 11:30:28</td></tr><tr><td>id/spizdilinicknamenaxyitvari</td><td class='mono dim'>30.11.2025, 18:51:16</td></tr><tr><td>id/riseuprise</td><td class='mono dim'>17.09.2025, 04:36:42</td></tr><tr><td>id/rarre1</td><td class='mono dim'>06.07.2025, 14:09:56</td></tr><tr><td>id/shadowwnfi</td><td class='mono dim'>24.05.2025, 23:19:40</td></tr><tr><td>id/mrrarehere</td><td class='mono dim'>31.01.2024, 12:14:30</td></tr><tr><td>id/glyklox</td><td class='mono dim'>12.01.2024, 11:24:25</td></tr><tr><td>id/raretampon3</td><td class='mono dim'>28.12.2023, 23:19:18</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Avatar History (131)</div>
+      <div class="panel-body"><div class="avatar-grid"><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/38cf9e490e73491bf1ceef84364b3df1b6db9328_medium.jpg" alt=""><span class="mono">07.03.2026, 00:22:17</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/7c0ca07275cdcedca4b45af0c2199d7a6725947f_medium.jpg" alt=""><span class="mono">03.01.2026, 11:30:28</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3e9094b25045d4a1129a7a3f092a6ea6092d2d0f_medium.jpg" alt=""><span class="mono">27.12.2025, 15:31:56</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/5dfe1e96163fd9de407a155f78031b636aef7927_medium.jpg" alt=""><span class="mono">09.12.2025, 22:54:35</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/315b51fedad911568007c2ae4d400f1a1cc9e32a_medium.jpg" alt=""><span class="mono">10.11.2025, 18:04:11</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c0af88cff9205a525372964e0488b82bbbff677a_medium.jpg" alt=""><span class="mono">07.11.2025, 01:11:52</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a175e2201f74475f6ee2c1b61e9a896ec2fe7c5e_medium.jpg" alt=""><span class="mono">01.11.2025, 13:38:02</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/05d59054ca73d05af052d4b01b36d163641ad83e_medium.jpg" alt=""><span class="mono">25.10.2025, 16:28:49</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a3e07feb3c8b59b403b7491ecf91bd62ad4b56e2_medium.jpg" alt=""><span class="mono">10.10.2025, 07:36:41</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/351a0f9af2ae9a10ef711bbf2c6eb10e7472c8a9_medium.jpg" alt=""><span class="mono">21.09.2025, 05:58:20</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3f6353ab79c8e7ec320059d795279abb5760a71f_medium.jpg" alt=""><span class="mono">12.09.2025, 00:54:05</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/ef717e05670863d870812428fb10c5738caba4c4_medium.jpg" alt=""><span class="mono">06.09.2025, 20:37:45</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/56bb5b85b221c73d4264991d69cdd674595c14d1_medium.jpg" alt=""><span class="mono">30.08.2025, 11:37:35</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/f13fb877496b977ad71b81955760ca5917ed6120_medium.jpg" alt=""><span class="mono">14.08.2025, 16:11:29</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d9a8bafb1965e39c5660f4d1f9c41de2e4a6e06e_medium.jpg" alt=""><span class="mono">13.08.2025, 13:17:45</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d5d94de6a418e4d66db5ced2c9d70192c1074d87_medium.jpg" alt=""><span class="mono">21.06.2025, 00:58:36</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d554369da5bf4dd1a5a27fd5f15bd416b55bf105_medium.jpg" alt=""><span class="mono">07.06.2025, 07:05:27</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/fcf8d1f38ca75dda435efceab5e588d90f83b4c7_medium.jpg" alt=""><span class="mono">31.05.2025, 03:02:13</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3f2bd4456c07d58fe6b09fed6567c221d3e28c98_medium.jpg" alt=""><span class="mono">28.05.2025, 01:03:53</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a183e903ad2cfd98f9f333e699e00ee86bef6f55_medium.jpg" alt=""><span class="mono">24.05.2025, 23:19:40</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/67e940294b7c6cb9c9c9441e23df43095d0f6a08_medium.jpg" alt=""><span class="mono">05.05.2025, 19:01:35</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/67e940294b7c6cb9c9c9441e23df43095d0f6a08_medium.jpg" alt=""><span class="mono">04.05.2025, 23:20:24</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d96ab18a191185802af71de79bf16b0e96159533_medium.jpg" alt=""><span class="mono">02.05.2025, 08:47:30</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a1fdf77a97fbd77bc9bedeefd5628979ac1897e8_medium.jpg" alt=""><span class="mono">25.04.2025, 02:02:33</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3754dcd3bd32755f0521469c08e380ff90549d95_medium.jpg" alt=""><span class="mono">21.04.2025, 12:47:21</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/6945b5a606e401113f4b15413a990c5b0652bea4_medium.jpg" alt=""><span class="mono">15.04.2025, 18:38:40</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/50b9af991fa8405100947a69152daab63507adce_medium.jpg" alt=""><span class="mono">10.04.2025, 12:46:14</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/50b9af991fa8405100947a69152daab63507adce_medium.jpg" alt=""><span class="mono">09.04.2025, 17:11:30</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a7ccb9274d161be9de1c6ec4fea233ae7d3f950f_medium.jpg" alt=""><span class="mono">06.04.2025, 06:16:56</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/6945b5a606e401113f4b15413a990c5b0652bea4_medium.jpg" alt=""><span class="mono">31.03.2025, 17:15:36</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/39a36ee39bc709376a916bca1d06d291bc1dc8c1_medium.jpg" alt=""><span class="mono">31.03.2025, 00:08:58</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/39a36ee39bc709376a916bca1d06d291bc1dc8c1_medium.jpg" alt=""><span class="mono">30.03.2025, 06:35:54</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/10d11ff3d881eda74795c9f2bb947d8aadbd221a_medium.jpg" alt=""><span class="mono">22.03.2025, 04:17:45</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/0983cb31007dc43e75b9a2a95601ae2575d5b4bf_medium.jpg" alt=""><span class="mono">07.03.2025, 07:20:57</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/31c04df23ed58452c91db9833fcd73a4d515d9d6_medium.jpg" alt=""><span class="mono">13.02.2025, 19:20:22</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/30802df760b5af502f4fcbba5cf0a6ea227b0b92_medium.jpg" alt=""><span class="mono">08.02.2025, 09:18:26</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/170139f2d94334b070eba9d530142029d3761e27_medium.jpg" alt=""><span class="mono">28.01.2025, 12:55:37</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b01bc4e6157950a58ef3ceb4e9f2af930b9dc7b7_medium.jpg" alt=""><span class="mono">01.01.2025, 00:30:48</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/f149969c6f4f00e952adfd7891cebbd8560c72db_medium.jpg" alt=""><span class="mono">13.12.2024, 06:11:20</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/5ed5fe9d3614ab7c9191db715d37fb3d43aa96fc_medium.jpg" alt=""><span class="mono">27.11.2024, 03:11:57</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/a332b27e0853de0a79d375f347676c1b6552f8f5_medium.jpg" alt=""><span class="mono">20.11.2024, 00:06:02</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d024717e66ea1623a3dd3aa31b68484dbfcf707d_medium.jpg" alt=""><span class="mono">12.11.2024, 22:35:20</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c1f856d31423581265ddf530e0e5c09e5b3731ba_medium.jpg" alt=""><span class="mono">23.10.2024, 16:36:37</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/35413155dca988dd957cf5112e2f75a23ee439f0_medium.jpg" alt=""><span class="mono">01.09.2024, 17:15:27</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e4847f19138ec0b21021971b139efa3422200024_medium.jpg" alt=""><span class="mono">31.08.2024, 05:42:57</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/7e723e69e5082170b3f8ccdc60c368918d64f1ee_medium.jpg" alt=""><span class="mono">21.08.2024, 16:51:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/334d13349704233fc65312bfe27d2c0da28b158c_medium.jpg" alt=""><span class="mono">16.06.2024, 12:29:13</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c1b3dd69770fb6c7f389d25696fedc94f9318385_medium.jpg" alt=""><span class="mono">07.05.2024, 23:02:28</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/204bde1d2b1a1f015027b854a808339b381656e5_medium.jpg" alt=""><span class="mono">30.04.2024, 18:22:42</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/1414e7ce9f482bcb76e298588c08ce3005654cf8_medium.jpg" alt=""><span class="mono">29.04.2024, 06:46:04</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/bc9454f175cabfae6d98767fb2aeb8f33d123026_medium.jpg" alt=""><span class="mono">15.04.2024, 01:45:40</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b47f41c63e53a7979b0b570807377ed342c93eae_medium.jpg" alt=""><span class="mono">12.04.2024, 17:21:38</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c115d073085cdd8004fc76b6b3f63a5bc0e460fb_medium.jpg" alt=""><span class="mono">11.04.2024, 06:56:21</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/9a09a3d303a4b766c98f693559bd549e9f78da2d_medium.jpg" alt=""><span class="mono">08.04.2024, 22:02:35</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/2e373133721fcffbb7f230b57c0454dba04995d6_medium.jpg" alt=""><span class="mono">08.04.2024, 05:55:53</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/aaf246e12f02d6fbc65c576626c8d4f5705b6993_medium.jpg" alt=""><span class="mono">02.04.2024, 06:04:16</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/001341e006e5004c2cc09d6d894bfc28b28d2b93_medium.jpg" alt=""><span class="mono">27.03.2024, 14:47:50</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_medium.jpg" alt=""><span class="mono">20.03.2024, 03:09:44</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/eab56701c98e76cb11daa7fa81d29561a8307633_medium.jpg" alt=""><span class="mono">19.03.2024, 07:20:38</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b71bcfedc9bd50e1481615f22edf943ba09ce450_medium.jpg" alt=""><span class="mono">13.03.2024, 17:55:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/89805c3927b29e9e47979ecba27200d56094cd1a_medium.jpg" alt=""><span class="mono">03.03.2024, 03:26:28</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/487987e6e2a5baf8d74d62e9f68964c3cd0e7905_medium.jpg" alt=""><span class="mono">26.02.2024, 15:20:22</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/2660a07371f09c4a1cb8870ec710a79a7b1163ea_medium.jpg" alt=""><span class="mono">12.02.2024, 16:33:48</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/408fa5f4aa2011080a86aef18f69395a3b2a661d_medium.jpg" alt=""><span class="mono">30.01.2024, 23:14:37</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/03372cd57ddc6e153b8974f265fa3caa0971aaa2_medium.jpg" alt=""><span class="mono">29.01.2024, 09:05:22</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d32c23d8b3b51acd4c8a6c4ad9e4ab4b080f6e1e_medium.jpg" alt=""><span class="mono">25.01.2024, 20:08:01</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/89a69b64d8e06424a04cd6135e798c5273770893_medium.jpg" alt=""><span class="mono">23.01.2024, 05:42:40</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/52233e1fa5635578842543cf080fa5d7de6cf8cd_medium.jpg" alt=""><span class="mono">19.01.2024, 22:35:10</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d5bba8baa7d0a1331de414d670eefdfc005cbd0f_medium.jpg" alt=""><span class="mono">18.01.2024, 23:47:05</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/30735eca6da0d93cd4742e591cba8fa9fa86bd83_medium.jpg" alt=""><span class="mono">17.01.2024, 05:46:36</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3b15ea6cd4295c829b4b6cdee81b8fdaf5a301d1_medium.jpg" alt=""><span class="mono">10.01.2024, 20:53:16</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/2ab40dbe1ceed5e10c94480771aba771271d5500_medium.jpg" alt=""><span class="mono">01.01.2024, 10:37:41</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/739e5b408d710553f47767c99f424a12770b1153_medium.jpg" alt=""><span class="mono">30.12.2023, 17:15:57</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/7a63ef08665253b85fc8fa8c9c3f3ff8d9e6ea97_medium.jpg" alt=""><span class="mono">26.12.2023, 17:53:32</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/aadc907fde4ad33fe8899ddb193ea21e07dc3778_medium.jpg" alt=""><span class="mono">25.12.2023, 08:56:13</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e643c812feece27c17ad274ee113b3c2efb3d202_medium.jpg" alt=""><span class="mono">19.12.2023, 21:50:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e60b59c50bcd783f36e06fd3a527d8bd8b3381fb_medium.jpg" alt=""><span class="mono">09.12.2023, 06:01:52</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/eefc5b719bd7b2a207bf7028adef85ec2e6ae47e_medium.jpg" alt=""><span class="mono">04.12.2023, 05:51:20</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/855a797cc3b7c8371d619d42af438855fed27ac9_medium.jpg" alt=""><span class="mono">30.11.2023, 22:11:16</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/6ffea522c41e44d9a1d2403ebaa5df51a89deb22_medium.jpg" alt=""><span class="mono">29.11.2023, 19:14:58</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e3cbe2c1fca7df5466e6047dd3402b345e5f70f9_medium.jpg" alt=""><span class="mono">21.11.2023, 23:52:57</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/5c3043046343bcdea26132c4513d20d85d683a7a_medium.jpg" alt=""><span class="mono">21.11.2023, 07:30:52</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b557b7e1f57e14b4e7521ae833414c496de5a160_medium.jpg" alt=""><span class="mono">19.11.2023, 15:36:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/84aa5c5daac71ba546b351032968ad3f81421e58_medium.jpg" alt=""><span class="mono">16.11.2023, 06:25:19</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/219d70453a0d56f4b1e9b20844767f5c59f18ead_medium.jpg" alt=""><span class="mono">10.11.2023, 04:08:34</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e33ecbf03b38896c1ad8bb2c4c496a954b659d75_medium.jpg" alt=""><span class="mono">09.11.2023, 11:33:51</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e10d4972b64be4353565e722891481e3c4941ac1_medium.jpg" alt=""><span class="mono">08.11.2023, 02:47:39</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/194bf4442d73eeb347140c55013480b266b81f4e_medium.jpg" alt=""><span class="mono">05.11.2023, 18:04:15</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/25efd637b01d56eb67c2584b045994f44a42f445_medium.jpg" alt=""><span class="mono">03.11.2023, 00:20:09</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/9e42bf4fa70faebead761b9ea7e17ff40a20bf99_medium.jpg" alt=""><span class="mono">02.11.2023, 08:00:31</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/1a8366b3aa41f2d6acef2da72331cd883ec4cfed_medium.jpg" alt=""><span class="mono">30.10.2023, 05:54:27</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e643c812feece27c17ad274ee113b3c2efb3d202_medium.jpg" alt=""><span class="mono">28.10.2023, 20:47:04</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e0a685383d0e0da5a39b2872e78ad49f41ca260a_medium.jpg" alt=""><span class="mono">14.10.2023, 17:06:15</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d6ee421e8c8c2111dec9c3cd9a9d637ce71ac966_medium.jpg" alt=""><span class="mono">11.10.2023, 05:46:17</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e643c812feece27c17ad274ee113b3c2efb3d202_medium.jpg" alt=""><span class="mono">09.10.2023, 18:15:32</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c1febc67ec53580979f2977df42d4b6a1c3cf9e5_medium.jpg" alt=""><span class="mono">25.09.2023, 17:47:29</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/953d7383f8151710189d9df171ff7b565ccd76bf_medium.jpg" alt=""><span class="mono">21.09.2023, 04:26:51</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e1b3e8aee5764e0de536e09870ddb3e36c9f7123_medium.jpg" alt=""><span class="mono">05.09.2023, 00:28:43</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/2a7df646945c0ced17f4e553799ab28176c21b37_medium.jpg" alt=""><span class="mono">27.08.2023, 19:04:21</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/81723d145038a86111619867a9a2596d6c0e2baa_medium.jpg" alt=""><span class="mono">17.08.2023, 09:00:21</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/fff34316bc64156a91ac6a9e598cf108565af941_medium.jpg" alt=""><span class="mono">13.08.2023, 20:13:18</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/edf04fbaac5cb4e97511c567e1060d8da6bb21b6_medium.jpg" alt=""><span class="mono">02.08.2023, 00:02:01</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/cefe8af0307c02922a484e9d1b58c92fae6f23f7_medium.jpg" alt=""><span class="mono">30.07.2023, 07:42:26</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/c239d9eb8367d38610452ab14fee0d99d2ecb0af_medium.jpg" alt=""><span class="mono">26.07.2023, 17:44:44</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/378959fcf86c06e383b57784a2c9b9516310c139_medium.jpg" alt=""><span class="mono">23.07.2023, 17:46:29</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/f028e82323cd9e8c0301f05ad5d402191c1483ca_medium.jpg" alt=""><span class="mono">12.07.2023, 16:10:20</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/321f357368184c43abb9e0f7486e7d67db8ceebd_medium.jpg" alt=""><span class="mono">10.07.2023, 11:36:12</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/e604df7c10edc9b85d633a7b221e819bc8d853ee_medium.jpg" alt=""><span class="mono">06.07.2023, 21:40:26</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/f8abe98a422ff182c247ca5468e570644c88680d_medium.jpg" alt=""><span class="mono">14.06.2023, 21:12:45</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b9041a137d7072854fa492d7619bd458c41be893_medium.jpg" alt=""><span class="mono">14.06.2023, 16:01:25</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/13fb68b1f14657274ee9252f4a8776aa33f43210_medium.jpg" alt=""><span class="mono">02.06.2023, 04:45:10</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d9f485b0cdf8c800520efc37bbfe0477525ebf28_medium.jpg" alt=""><span class="mono">01.06.2023, 12:46:42</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/00078981c1665e13af55acc4e13763994d598569_medium.jpg" alt=""><span class="mono">22.05.2023, 19:05:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/967513b95a64566ae66dca828f305c32ebc82534_medium.jpg" alt=""><span class="mono">20.05.2023, 18:15:50</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/2f6b43f23c3dab614fac1bd8572858dd5ec51b65_medium.jpg" alt=""><span class="mono">17.05.2023, 23:27:34</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/368da88c32bd3ce2bfdac4b387772d62c82017ee_medium.jpg" alt=""><span class="mono">16.05.2023, 16:43:17</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/b0e726f4713bffb73c1f7e6db0c8beeab64bb441_medium.jpg" alt=""><span class="mono">15.05.2023, 23:08:07</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/9fe66ffe6d62c0300558d86a7774d4979d90e903_medium.jpg" alt=""><span class="mono">15.05.2023, 15:38:12</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/39d538bb8a6e15a7bf8623777f7b7279c5914ab5_medium.jpg" alt=""><span class="mono">15.05.2023, 03:08:03</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/f0e7caa01750bb49564855edb393c300c89f1143_medium.jpg" alt=""><span class="mono">12.05.2023, 22:27:17</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/efedeebb5cb8839e6bc75b4fb2d094383aed1472_medium.jpg" alt=""><span class="mono">07.05.2023, 00:20:26</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/6200cbd1c6626fac14d419c5c7cf19b7d421bf12_medium.jpg" alt=""><span class="mono">04.05.2023, 19:05:26</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/ef56425ad4c971f27fce43db85f6c5d79a82e69e_medium.jpg" alt=""><span class="mono">01.05.2023, 14:10:06</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/ab32fd757029cf265c03906de01b4d25a8f2c3bb_medium.jpg" alt=""><span class="mono">27.04.2023, 06:04:17</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/5b609e3efeeb983aaa0ec2c92a78db50617b2b84_medium.jpg" alt=""><span class="mono">26.04.2023, 05:27:33</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/7f59528162b29c4bdc69e46f0d646742142f11a8_medium.jpg" alt=""><span class="mono">19.04.2023, 20:38:13</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/de1e5e5d78479a8e098cf6eb0b46a6bbcdd67ffb_medium.jpg" alt=""><span class="mono">14.04.2023, 00:29:54</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/4dce4695620618a64b9d354edaa0573ab3e1383c_medium.jpg" alt=""><span class="mono">11.04.2023, 20:50:33</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/fcbc4db22ff61bb6d1b7cd36a0e11d407e0bb348_medium.jpg" alt=""><span class="mono">09.04.2023, 01:10:49</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/d45a3c756868395d9ff73dde5635a8dd6443c154_medium.jpg" alt=""><span class="mono">07.04.2023, 16:34:18</span></div><div class="av-item"><img src="https://avatars.akamai.steamstatic.com/3ddd7b417fb1d738a29e1df22ea6e73de5910f2b_medium.jpg" alt=""><span class="mono">01.04.2023, 15:30:07</span></div></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const name = tab.dataset.tab;
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'graph') initGraph();
+  });
+});
+
+// ── D3 Graph ──────────────────────────────────────────────────────────────────
+const GRAPH = {"nodes": [{"id": "76561199018462042", "label": "rare", "avatar": "https://avatars.steamstatic.com/38cf9e490e73491bf1ceef84364b3df1b6db9328_full.jpg", "type": "target"}, {"id": "76561199016881359", "label": "-Marshalll-", "avatar": "https://avatars.steamstatic.com/4ee65331eb7a478fdab8bb02d4216d007463f3b1_full.jpg", "type": "friend", "since": "2025-05-17 20:48"}, {"id": "76561199101511059", "label": "\u5200\u5c38\u53e3\u531a\u4e01\u4ec8\u535e\u4e2b\u3112\u957f\u4e39", "avatar": "https://avatars.steamstatic.com/50c1deea138373f4e8b288d6c84fb7081aaada93_full.jpg", "type": "friend", "since": "2025-03-15 06:55"}, {"id": "76561199562431649", "label": "Mar$", "avatar": "https://avatars.steamstatic.com/d48d02585156ad9513051cd897f17c5a7a7f1f68_full.jpg", "type": "friend", "since": "2025-07-06 22:00"}, {"id": "76561198365070240", "label": "Lanugare", "avatar": "https://avatars.steamstatic.com/eaba2639214cb255f06d04ce7e1430adc16ef58f_full.jpg", "type": "friend", "since": "2023-06-23 14:18"}, {"id": "76561199177852443", "label": "POJIRATEL_GALAKTIKI", "avatar": "https://avatars.steamstatic.com/45a767ef556bdb615db5886d9cfeb5a30279ad77_full.jpg", "type": "friend", "since": "2022-01-07 16:39"}, {"id": "76561198994317324", "label": "Arturchik Parkourchik", "avatar": "https://avatars.steamstatic.com/6caf9fd33311d78888f1097cff1b447b6708afcc_full.jpg", "type": "friend", "since": "2022-01-27 16:16"}, {"id": "76561199021828493", "label": "Little Partizan", "avatar": "https://avatars.steamstatic.com/61d4f299ad6e1c3ad3be30064290ed8ffabb1d17_full.jpg", "type": "friend", "since": "2025-04-06 21:25"}, {"id": "76561199811833899", "label": "Randomshtein", "avatar": "https://avatars.steamstatic.com/ad49e2fd843b8bd276eef7db0a5b1db447b2be9d_full.jpg", "type": "friend", "since": "2025-07-24 22:04"}, {"id": "76561199195139839", "label": "\u041a\u0438\u0440\u0438\u043b\u043b \u0424\u0438\u0441\u0442\u0430\u0448\u043a\u0430", "avatar": "https://avatars.steamstatic.com/ae8fdc625012ea9e0db5a394bcc78a56813096d1_full.jpg", "type": "friend", "since": "2025-03-06 01:43"}, {"id": "76561199117855889", "label": "GoldenPotAte", "avatar": "https://avatars.steamstatic.com/a55fe6ecdc9ff1008dc3fb73eff8f2e02569bf5d_full.jpg", "type": "friend", "since": "2023-12-08 13:29"}, {"id": "76561199497352222", "label": "Mmkh", "avatar": "https://avatars.steamstatic.com/6d6d360c563e2d3c9fbe500a1a035e47a5c8826f_full.jpg", "type": "friend", "since": "2024-01-27 14:02"}, {"id": "76561199245342060", "label": "\udb80\udc1f\u041f\u0447\u043e\u043b\udb80\udc1f", "avatar": "https://avatars.steamstatic.com/a20bff0463a8357ca3c6d86ac02ff215c8d2208e_full.jpg", "type": "friend", "since": "2024-10-04 22:10"}, {"id": "76561199039654377", "label": "Maestro", "avatar": "https://avatars.steamstatic.com/d08d30e5be5da5df4e93ff72b7200fba54ce8d8f_full.jpg", "type": "friend", "since": "2025-12-05 16:44"}, {"id": "76561199054294119", "label": "qqq", "avatar": "https://avatars.steamstatic.com/aeffe459d6db6decf8c1f4107e2b855ed08a5e00_full.jpg", "type": "friend", "since": "2025-09-20 00:07"}, {"id": "76561199181478374", "label": "JesseB", "avatar": "https://avatars.steamstatic.com/e4567264f82c606fb4e4bb702cb995394848eec9_full.jpg", "type": "friend", "since": "2025-12-17 03:18"}, {"id": "76561198842472200", "label": "August liga de leyendas", "avatar": "https://avatars.steamstatic.com/92b9d2c3b29a307fa2f80901ec3b6cc961f077b1_full.jpg", "type": "friend", "since": "2024-01-28 18:47"}, {"id": "76561198997763317", "label": "Feiman", "avatar": "https://avatars.steamstatic.com/5ad9da4eea7585f73ae9be2f99bdd4de6ce56ad0_full.jpg", "type": "friend", "since": "2025-06-21 23:38"}, {"id": "76561198166399080", "label": "Kipper WHO?", "avatar": "https://avatars.steamstatic.com/ecf9675a9e0e32d138fa96d92c879734f5136215_full.jpg", "type": "friend", "since": "2025-01-21 20:44"}, {"id": "76561199230566416", "label": "nenaturboss", "avatar": "https://avatars.steamstatic.com/7318fee55ba6edabca045e2281a7c1fd447f97b8_full.jpg", "type": "friend", "since": "2025-04-11 21:11"}, {"id": "76561199348028000", "label": "Jim Bonacii", "avatar": "https://avatars.steamstatic.com/25c98d92ef106c76a08c20ce86ce611959542fe1_full.jpg", "type": "friend", "since": "2025-07-07 10:48"}, {"id": "76561199036014853", "label": "Patix", "avatar": "https://avatars.steamstatic.com/a7a3ac2a531ac0feca738d182fafbb81c7ef1d71_full.jpg", "type": "friend", "since": "2023-01-06 12:12"}, {"id": "76561199473232732", "label": "The_Global", "avatar": "https://avatars.steamstatic.com/a142b427efbb490ad6e1493bcbba38dd27d91bf6_full.jpg", "type": "friend", "since": "2025-02-23 00:05"}, {"id": "76561199088047561", "label": "\udb80\udc10\u840c\u840c\u7684\u65b0\udb80\udc10", "avatar": "https://avatars.steamstatic.com/1ae3bca62521d6117d48d1d058d5ddcb154cf750_full.jpg", "type": "friend", "since": "2024-07-30 17:46"}, {"id": "76561199076059219", "label": "\u0414\u0430\u043d\u0438\u043b \u041a\u043e\u043b\u0431\u0430\u0441\u0435\u043d\u043a\u043e", "avatar": "https://avatars.steamstatic.com/890bc208531e66d1f5fd9184b2493ba083aea00e_full.jpg", "type": "friend", "since": "2023-06-26 16:02"}, {"id": "76561198453411788", "label": "\udb80\udc12 alexa.vesna \udb80\udc12", "avatar": "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg", "type": "friend", "since": "2023-06-03 18:12"}, {"id": "76561198416379642", "label": "Gi-Go", "avatar": "https://avatars.steamstatic.com/a0f0b930525e78a030fc95748f68fda5a0b312d1_full.jpg", "type": "friend", "since": "2025-05-26 22:58"}, {"id": "76561199223309447", "label": "\udb80\udc12\u0411\u0430\u043a\u043b\u0430\u043d\udb80\udc12", "avatar": "https://avatars.steamstatic.com/8ce4714bf5bd567ee79eeed4be90c78445bd12b7_full.jpg", "type": "friend", "since": "2023-12-07 01:36"}, {"id": "76561199381213311", "label": "Neylon Heaven", "avatar": "https://avatars.steamstatic.com/83cd5bcd8fcbc6cdbffe2576a8398325cab350d8_full.jpg", "type": "friend", "since": "2023-10-27 22:07"}, {"id": "76561198095780023", "label": "\u0421\u043e\u043b\u0435\u0432\u043e\u0439 \u0414\u0435\u0434", "avatar": "https://avatars.steamstatic.com/e0bfa12b26b1c168843936529401dc3c9364ef6e_full.jpg", "type": "friend", "since": "2023-11-16 00:08"}, {"id": "76561199025081314", "label": "\udb80\udc0b\u0442\u0440\u044d\u0448\udb80\udc0b", "avatar": "https://avatars.steamstatic.com/47534f2b225b6113aff8811ec31caa40e95755cd_full.jpg", "type": "friend", "since": "2023-06-06 19:51"}, {"id": "76561198972771854", "label": "Keknutui", "avatar": "https://avatars.steamstatic.com/5803be6325bd93692333a8bf31d97bab6c0b71e8_full.jpg", "type": "friend", "since": "2026-01-01 19:46"}, {"id": "76561198116832002", "label": "Linux12", "avatar": "https://avatars.steamstatic.com/ad0c8c39de6ae6e29eef28cb61785ee88bf8e2bc_full.jpg", "type": "friend", "since": "2022-10-23 15:18"}, {"id": "76561199551115980", "label": "TraKtor", "avatar": "https://avatars.steamstatic.com/c75814f3f9f638f4d2975a52293c297eb124e1bd_full.jpg", "type": "friend", "since": "2026-02-09 18:47"}, {"id": "76561199187184258", "label": "Dawas", "avatar": "https://avatars.steamstatic.com/1721bf2f46cefad0c23d8c81da102f2e3df08a55_full.jpg", "type": "friend", "since": "2023-10-15 11:51"}, {"id": "76561198062008079", "label": "Bitey", "avatar": "https://avatars.steamstatic.com/47e7d5610ca4c0e6a5ba484761363e326dc2f350_full.jpg", "type": "friend", "since": "2022-02-11 18:30"}, {"id": "76561198967752077", "label": "Zik_Games", "avatar": "https://avatars.steamstatic.com/1dedaadabd1b8972f315c25adb7ce547357067c8_full.jpg", "type": "friend", "since": "2024-09-10 22:41"}, {"id": "76561199192655522", "label": "Ogarodnek", "avatar": "https://avatars.steamstatic.com/77ede991564239a8111f62933f8a07c78286ec0c_full.jpg", "type": "friend", "since": "2025-02-22 23:58"}, {"id": "76561198017566455", "label": "Justice.jpg", "avatar": "https://avatars.steamstatic.com/dd596ef784b4f6cbf39caad054029c89c15a908e_full.jpg", "type": "friend", "since": "2023-11-12 14:14"}, {"id": "76561199438334149", "label": "lil loaded", "avatar": "https://avatars.steamstatic.com/f84972d2f653ef28bac329aa813f29d7a145ca4f_full.jpg", "type": "friend", "since": "2025-05-18 02:25"}, {"id": "76561199185483792", "label": "silviussa", "avatar": "https://avatars.steamstatic.com/2b963ed04c935a4dcdd5691517a1f0cc43a2d934_full.jpg", "type": "friend", "since": "2023-04-29 03:34"}, {"id": "76561199221119315", "label": "Andrewex", "avatar": "https://avatars.steamstatic.com/79a8119bd2a027755f93872d0d09b959909a0405_full.jpg", "type": "friend", "since": "2025-02-28 22:34"}, {"id": "76561198960451159", "label": "mazbezzz", "avatar": "https://avatars.steamstatic.com/76c2c57990ae1af551df7337b66debf3946cccbc_full.jpg", "type": "friend", "since": "2022-01-20 00:02"}, {"id": "76561199207564638", "label": "NsD \u2605 \u2022Nakuma\u2022", "avatar": "https://avatars.steamstatic.com/0341ba8f018a519c9b8d67c79b432d9066aeac69_full.jpg", "type": "friend", "since": "2022-02-25 15:53"}, {"id": "76561198056448151", "label": "Skiller", "avatar": "https://avatars.steamstatic.com/31466bfbfe84f6de72acab3334863ac0cceceef4_full.jpg", "type": "friend", "since": "2026-02-03 16:33"}, {"id": "76561199397116107", "label": "\u222e\u2746Elternass\u2746\u222e", "avatar": "https://avatars.steamstatic.com/9dc478703a857e295bca57a4f735a3ccd0bfc251_full.jpg", "type": "friend", "since": "2025-06-06 19:59"}, {"id": "76561199405824255", "label": "\u0427\u0430\u0439", "avatar": "https://avatars.steamstatic.com/9379ade52b03024563cd7ea995bf53eb0bf5cb8c_full.jpg", "type": "friend", "since": "2023-01-31 23:42"}, {"id": "76561199210373017", "label": "Vergil", "avatar": "https://avatars.steamstatic.com/1b7e6471e5b8255d9cc2dc22e4a02525e03b115b_full.jpg", "type": "friend", "since": "2022-10-02 21:52"}, {"id": "76561199119627994", "label": "Probot", "avatar": "https://avatars.steamstatic.com/a0abb3c94a869f5f5a4cb105ff3af677f93c2a7f_full.jpg", "type": "friend", "since": "2023-01-30 18:38"}, {"id": "76561198318336717", "label": "Sbryf", "avatar": "https://avatars.steamstatic.com/50ed87237cd2ab636c38cd3198593147030bd571_full.jpg", "type": "friend", "since": "2025-02-07 02:29"}, {"id": "76561199128509202", "label": "Elvis Presley", "avatar": "https://avatars.steamstatic.com/71bfce02c6e9d0bfa9fa85459b81be6bd0283d6a_full.jpg", "type": "friend", "since": "2024-08-24 17:35"}, {"id": "76561199244783431", "label": "emankc\u00b9n", "avatar": "https://avatars.steamstatic.com/a7d16793c2b136cceb768b65625c19d3c85acbeb_full.jpg", "type": "friend", "since": "2026-02-03 18:06"}, {"id": "76561199098831103", "label": "\udb80\udc00The Long Diablo2.0\udb80\udc00", "avatar": "https://avatars.steamstatic.com/1d70e60f7f20ba09461c12e4d362e1e0a00bc3b6_full.jpg", "type": "friend", "since": "2022-11-12 03:34"}, {"id": "76561198178811654", "label": "BADnik", "avatar": "https://avatars.steamstatic.com/c3e808aa402ee61badd29d2a35baebf971efb71f_full.jpg", "type": "friend", "since": "2025-10-28 23:15"}, {"id": "76561199206570585", "label": "\u0423\u0448\u0435\u043b \u0432 \u0410\u0440\u043c\u0438\u044e", "avatar": "https://avatars.steamstatic.com/1994cab6cd82b234a5e396158028e5341a9aacb7_full.jpg", "type": "friend", "since": "2025-01-27 21:55"}, {"id": "76561199835643911", "label": "\udb80\udc1bOLIVIA\udb80\udc1b", "avatar": "https://avatars.steamstatic.com/d79026fac45b1bc64f1c814e1a7e883ab2198810_full.jpg", "type": "connection", "since": "2026-03-12 07:29"}, {"id": "76561199855175908", "label": "Wali", "avatar": "https://avatars.steamstatic.com/9b4de9738ce5e8e281683282881f606a8b353f86_full.jpg", "type": "connection", "since": "2026-03-10 09:21"}, {"id": "76561199516455145", "label": "Apch", "avatar": "https://avatars.steamstatic.com/f230fe4b65fae9c70382085f8478602ded9f9354_full.jpg", "type": "connection", "since": "2026-03-09 17:50"}, {"id": "76561199698759942", "label": "AmNum", "avatar": "https://avatars.steamstatic.com/f2aab6926691767877890cd2f4d5cefa84a0df73_full.jpg", "type": "connection", "since": "2026-03-04 13:40"}, {"id": "76561199206964399", "label": "heheess", "avatar": "https://avatars.steamstatic.com/c3eb170c8e84753ff45e69e6eb61533e38d20a42_full.jpg", "type": "connection", "since": "2026-02-13 02:15"}, {"id": "76561199014828960", "label": "ArErNon\u0caa\u0ccb\u0ca1\u0cbf\u0c97\u0cc6", "avatar": "https://avatars.steamstatic.com/5ee76f4ee511530ea12ba90d68fa8bca34ccee08_full.jpg", "type": "connection", "since": "2026-02-12 21:43"}, {"id": "76561199231694390", "label": "\u0431\u0438\u0433 \u044f\u0445\u0443 \u041e\u041e\u041e\u041e", "avatar": "https://avatars.steamstatic.com/3456a2d39064fe0f38904da3e0d1ba15b725eb6c_full.jpg", "type": "connection", "since": "2026-01-28 14:09"}, {"id": "76561198156811558", "label": "\ud83d\udd30Molfar\ud83d\udd30", "avatar": "https://avatars.steamstatic.com/611b3c532412b27194c5480dd5b6863f49401c67_full.jpg", "type": "connection", "since": "2026-01-02 18:07"}, {"id": "76561198400644872", "label": "Da Mi un Grrrr", "avatar": "https://avatars.steamstatic.com/c2d4e2653a82f2724722c70a0e949a0778e3dc5f_full.jpg", "type": "connection", "since": "2025-12-09 14:49"}, {"id": "76561199822928883", "label": "Patix", "avatar": "https://avatars.steamstatic.com/093d76fcfb27216e2d24cd88d7784a410fa6fbc5_full.jpg", "type": "connection", "since": "2025-11-17 22:17"}, {"id": "76561198370374250", "label": "Pego", "avatar": "https://avatars.steamstatic.com/5b8825b34c5d77b00c3a18897f2f1175fa0e0e57_full.jpg", "type": "connection", "since": "2025-09-12 20:02"}, {"id": "76561199513336447", "label": "natureboss", "avatar": "https://avatars.steamstatic.com/97e463a36f2693f6158631fb69c4074694019c20_full.jpg", "type": "connection", "since": "2025-08-31 19:22"}, {"id": "76561199071567515", "label": "\u0420\u044b\u0431\u0430 \u043d\u0435", "avatar": "https://avatars.steamstatic.com/20b5a0f40f9171e6caea5f5deabcf8822ba03c64_full.jpg", "type": "connection", "since": "2025-08-31 13:28"}, {"id": "76561199353746526", "label": "\u0421ult of Daxao", "avatar": "https://avatars.steamstatic.com/0b2f011136c60ddbd58012073f5dae755c843693_full.jpg", "type": "connection", "since": "2025-08-30 04:46"}, {"id": "76561198863459473", "label": "Iabsemmelia", "avatar": "https://avatars.steamstatic.com/07bd7cf7f6a024ec1d910b9f3cb1a647bacbd02c_full.jpg", "type": "connection", "since": "2025-08-28 19:24"}, {"id": "76561199026669453", "label": "[\u0427\u0412] \u262d\u041c\u0438\u043d\u043e\u0442\u0430\u0432\u0440\u262d", "avatar": "https://avatars.steamstatic.com/dcce5f1232dfa1c2ff448233398496c6baedf12d_full.jpg", "type": "connection", "since": "2025-08-24 13:15"}, {"id": "76561199509533216", "label": "\u041f\u0430\u0443\u0447\u0438\u0439 \u0434\u0440\u0443\u0433", "avatar": "https://avatars.steamstatic.com/19dc6654633dbf9b86f8f8f38469e9f42567b276_full.jpg", "type": "connection", "since": "2025-08-21 19:14"}], "links": [{"source": "76561199018462042", "target": "76561199016881359", "type": "friend"}, {"source": "76561199018462042", "target": "76561199101511059", "type": "friend"}, {"source": "76561199018462042", "target": "76561199562431649", "type": "friend"}, {"source": "76561199018462042", "target": "76561198365070240", "type": "friend"}, {"source": "76561199018462042", "target": "76561199177852443", "type": "friend"}, {"source": "76561199018462042", "target": "76561198994317324", "type": "friend"}, {"source": "76561199018462042", "target": "76561199021828493", "type": "friend"}, {"source": "76561199018462042", "target": "76561199811833899", "type": "friend"}, {"source": "76561199018462042", "target": "76561199195139839", "type": "friend"}, {"source": "76561199018462042", "target": "76561199117855889", "type": "friend"}, {"source": "76561199018462042", "target": "76561199497352222", "type": "friend"}, {"source": "76561199018462042", "target": "76561199245342060", "type": "friend"}, {"source": "76561199018462042", "target": "76561199039654377", "type": "friend"}, {"source": "76561199018462042", "target": "76561199054294119", "type": "friend"}, {"source": "76561199018462042", "target": "76561199181478374", "type": "friend"}, {"source": "76561199018462042", "target": "76561198842472200", "type": "friend"}, {"source": "76561199018462042", "target": "76561198997763317", "type": "friend"}, {"source": "76561199018462042", "target": "76561198166399080", "type": "friend"}, {"source": "76561199018462042", "target": "76561199230566416", "type": "friend"}, {"source": "76561199018462042", "target": "76561199348028000", "type": "friend"}, {"source": "76561199018462042", "target": "76561199036014853", "type": "friend"}, {"source": "76561199018462042", "target": "76561199473232732", "type": "friend"}, {"source": "76561199018462042", "target": "76561199088047561", "type": "friend"}, {"source": "76561199018462042", "target": "76561199076059219", "type": "friend"}, {"source": "76561199018462042", "target": "76561198453411788", "type": "friend"}, {"source": "76561199018462042", "target": "76561198416379642", "type": "friend"}, {"source": "76561199018462042", "target": "76561199223309447", "type": "friend"}, {"source": "76561199018462042", "target": "76561199381213311", "type": "friend"}, {"source": "76561199018462042", "target": "76561198095780023", "type": "friend"}, {"source": "76561199018462042", "target": "76561199025081314", "type": "friend"}, {"source": "76561199018462042", "target": "76561198972771854", "type": "friend"}, {"source": "76561199018462042", "target": "76561198116832002", "type": "friend"}, {"source": "76561199018462042", "target": "76561199551115980", "type": "friend"}, {"source": "76561199018462042", "target": "76561199187184258", "type": "friend"}, {"source": "76561199018462042", "target": "76561198062008079", "type": "friend"}, {"source": "76561199018462042", "target": "76561198967752077", "type": "friend"}, {"source": "76561199018462042", "target": "76561199192655522", "type": "friend"}, {"source": "76561199018462042", "target": "76561198017566455", "type": "friend"}, {"source": "76561199018462042", "target": "76561199438334149", "type": "friend"}, {"source": "76561199018462042", "target": "76561199185483792", "type": "friend"}, {"source": "76561199018462042", "target": "76561199221119315", "type": "friend"}, {"source": "76561199018462042", "target": "76561198960451159", "type": "friend"}, {"source": "76561199018462042", "target": "76561199207564638", "type": "friend"}, {"source": "76561199018462042", "target": "76561198056448151", "type": "friend"}, {"source": "76561199018462042", "target": "76561199397116107", "type": "friend"}, {"source": "76561199018462042", "target": "76561199405824255", "type": "friend"}, {"source": "76561199018462042", "target": "76561199210373017", "type": "friend"}, {"source": "76561199018462042", "target": "76561199119627994", "type": "friend"}, {"source": "76561199018462042", "target": "76561198318336717", "type": "friend"}, {"source": "76561199018462042", "target": "76561199128509202", "type": "friend"}, {"source": "76561199018462042", "target": "76561199244783431", "type": "friend"}, {"source": "76561199018462042", "target": "76561199098831103", "type": "friend"}, {"source": "76561199018462042", "target": "76561198178811654", "type": "friend"}, {"source": "76561199018462042", "target": "76561199206570585", "type": "friend"}, {"source": "76561199018462042", "target": "76561199835643911", "type": "connection"}, {"source": "76561199018462042", "target": "76561199855175908", "type": "connection"}, {"source": "76561199018462042", "target": "76561199516455145", "type": "connection"}, {"source": "76561199018462042", "target": "76561199698759942", "type": "connection"}, {"source": "76561199018462042", "target": "76561199206964399", "type": "connection"}, {"source": "76561199018462042", "target": "76561199014828960", "type": "connection"}, {"source": "76561199018462042", "target": "76561199231694390", "type": "connection"}, {"source": "76561199018462042", "target": "76561199177852443", "type": "connection"}, {"source": "76561199018462042", "target": "76561199021828493", "type": "connection"}, {"source": "76561199018462042", "target": "76561199016881359", "type": "connection"}, {"source": "76561199018462042", "target": "76561198156811558", "type": "connection"}, {"source": "76561199018462042", "target": "76561198365070240", "type": "connection"}, {"source": "76561199018462042", "target": "76561198400644872", "type": "connection"}, {"source": "76561199018462042", "target": "76561199822928883", "type": "connection"}, {"source": "76561199018462042", "target": "76561198370374250", "type": "connection"}, {"source": "76561199018462042", "target": "76561199513336447", "type": "connection"}, {"source": "76561199018462042", "target": "76561199071567515", "type": "connection"}, {"source": "76561199018462042", "target": "76561199353746526", "type": "connection"}, {"source": "76561199018462042", "target": "76561198863459473", "type": "connection"}, {"source": "76561199018462042", "target": "76561198994317324", "type": "connection"}, {"source": "76561199018462042", "target": "76561199811833899", "type": "connection"}, {"source": "76561199018462042", "target": "76561199026669453", "type": "connection"}, {"source": "76561199018462042", "target": "76561199562431649", "type": "connection"}, {"source": "76561199018462042", "target": "76561199509533216", "type": "connection"}, {"source": "76561199018462042", "target": "76561199101511059", "type": "connection"}, {"source": "76561199018462042", "target": "76561199018462042", "type": "connection"}, {"source": "76561199018462042", "target": "76561199195139839", "type": "connection"}, {"source": "76561199018462042", "target": "76561199117855889", "type": "connection"}, {"source": "76561199018462042", "target": "76561199497352222", "type": "connection"}, {"source": "76561199018462042", "target": "76561199245342060", "type": "connection"}, {"source": "76561199018462042", "target": "76561199039654377", "type": "connection"}, {"source": "76561199018462042", "target": "76561199054294119", "type": "connection"}, {"source": "76561199018462042", "target": "76561199181478374", "type": "connection"}, {"source": "76561199018462042", "target": "76561198842472200", "type": "connection"}, {"source": "76561199018462042", "target": "76561198997763317", "type": "connection"}, {"source": "76561199018462042", "target": "76561198166399080", "type": "connection"}, {"source": "76561199018462042", "target": "76561199230566416", "type": "connection"}, {"source": "76561199018462042", "target": "76561199348028000", "type": "connection"}, {"source": "76561199018462042", "target": "76561199036014853", "type": "connection"}, {"source": "76561199018462042", "target": "76561199473232732", "type": "connection"}, {"source": "76561199018462042", "target": "76561199088047561", "type": "connection"}, {"source": "76561199018462042", "target": "76561199076059219", "type": "connection"}, {"source": "76561199018462042", "target": "76561198453411788", "type": "connection"}, {"source": "76561199018462042", "target": "76561198416379642", "type": "connection"}, {"source": "76561199018462042", "target": "76561199223309447", "type": "connection"}, {"source": "76561199018462042", "target": "76561199381213311", "type": "connection"}, {"source": "76561199018462042", "target": "76561198095780023", "type": "connection"}, {"source": "76561199018462042", "target": "76561199025081314", "type": "connection"}, {"source": "76561199018462042", "target": "76561198972771854", "type": "connection"}, {"source": "76561199018462042", "target": "76561198116832002", "type": "connection"}, {"source": "76561199018462042", "target": "76561199551115980", "type": "connection"}, {"source": "76561199018462042", "target": "76561199187184258", "type": "connection"}, {"source": "76561199018462042", "target": "76561198062008079", "type": "connection"}, {"source": "76561199018462042", "target": "76561198967752077", "type": "connection"}, {"source": "76561199018462042", "target": "76561199192655522", "type": "connection"}, {"source": "76561199018462042", "target": "76561198017566455", "type": "connection"}, {"source": "76561199018462042", "target": "76561199438334149", "type": "connection"}, {"source": "76561199018462042", "target": "76561199185483792", "type": "connection"}, {"source": "76561199018462042", "target": "76561199221119315", "type": "connection"}, {"source": "76561199018462042", "target": "76561198960451159", "type": "connection"}, {"source": "76561199018462042", "target": "76561199207564638", "type": "connection"}, {"source": "76561199018462042", "target": "76561198056448151", "type": "connection"}, {"source": "76561199018462042", "target": "76561199397116107", "type": "connection"}, {"source": "76561199018462042", "target": "76561199405824255", "type": "connection"}, {"source": "76561199018462042", "target": "76561199210373017", "type": "connection"}, {"source": "76561199018462042", "target": "76561199119627994", "type": "connection"}, {"source": "76561199018462042", "target": "76561198318336717", "type": "connection"}, {"source": "76561199018462042", "target": "76561199128509202", "type": "connection"}, {"source": "76561199018462042", "target": "76561199244783431", "type": "connection"}, {"source": "76561199018462042", "target": "76561199098831103", "type": "connection"}, {"source": "76561199018462042", "target": "76561198178811654", "type": "connection"}, {"source": "76561199018462042", "target": "76561199206570585", "type": "connection"}]};
+let graphInited = false;
+
+function initGraph() {
+  if (graphInited) return;
+  graphInited = true;
+
+  const wrap = document.getElementById('graph-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  const tip = document.getElementById('gtip');
+  const colors = { target: '#c6a850', friend: '#a4d007', connection: '#66c0f4' };
+
+  const svg = d3.select('#graph-svg');
+  const g   = svg.append('g');
+
+  svg.call(
+    d3.zoom().scaleExtent([.15, 4])
+      .on('zoom', e => g.attr('transform', e.transform))
+  );
+
+  const sim = d3.forceSimulation(GRAPH.nodes)
+    .force('link',    d3.forceLink(GRAPH.links).id(d => d.id).distance(d => d.type === 'friend' ? 110 : 150).strength(.5))
+    .force('charge',  d3.forceManyBody().strength(-350))
+    .force('center',  d3.forceCenter(W / 2, H / 2))
+    .force('collide', d3.forceCollide(24));
+
+  const defs = svg.append('defs');
+
+  // Gradient for links
+  defs.append('marker').attr('id','arr-f').attr('viewBox','0 -4 8 8').attr('refX',18).attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
+    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','#a4d00766');
+  defs.append('marker').attr('id','arr-c').attr('viewBox','0 -4 8 8').attr('refX',16).attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
+    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','#66c0f455');
+
+  const link = g.append('g').selectAll('line').data(GRAPH.links).join('line')
+    .attr('stroke',       d => d.type === 'friend' ? '#a4d00760' : '#66c0f445')
+    .attr('stroke-width', d => d.type === 'friend' ? 1.5 : 1)
+    .attr('marker-end',   d => d.type === 'friend' ? 'url(#arr-f)' : 'url(#arr-c)');
+
+  const node = g.append('g').selectAll('g').data(GRAPH.nodes).join('g')
+    .attr('cursor', 'pointer')
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) sim.alphaTarget(.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag',  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end',   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  // Outer glow ring for target
+  node.filter(d => d.type === 'target').append('circle')
+    .attr('r', 30).attr('fill', 'none')
+    .attr('stroke', '#c6a850').attr('stroke-width', 1).attr('opacity', .35)
+    .attr('stroke-dasharray', '4 3');
+
+  // Main circle
+  node.append('circle')
+    .attr('r', d => d.type === 'target' ? 22 : 13)
+    .attr('fill',         d => colors[d.type] + '20')
+    .attr('stroke',       d => colors[d.type])
+    .attr('stroke-width', d => d.type === 'target' ? 2.5 : 1.5);
+
+  // Clip paths for avatars
+  GRAPH.nodes.forEach((d, i) => {
+    const r = d.type === 'target' ? 20 : 11;
+    defs.append('clipPath').attr('id', `cl${i}`).append('circle').attr('r', r);
+    if (d.avatar) {
+      node.filter((nd, ni) => ni === i)
+        .append('image')
+        .attr('href', d.avatar)
+        .attr('x', -r).attr('y', -r)
+        .attr('width', r * 2).attr('height', r * 2)
+        .attr('clip-path', `url(#cl${i})`);
+    }
+  });
+
+  // Label
+  node.append('text')
+    .text(d => d.label.length > 14 ? d.label.slice(0, 13) + '…' : d.label)
+    .attr('y',            d => (d.type === 'target' ? 22 : 13) + 13)
+    .attr('text-anchor',  'middle')
+    .attr('fill',         d => colors[d.type])
+    .attr('font-size',    d => d.type === 'target' ? '11px' : '9px')
+    .attr('font-family',  "'Share Tech Mono', monospace");
+
+  // Tooltip + click → Steam profile
+  node
+    .on('mouseover', (e, d) => {
+      tip.style.display = 'block';
+      tip.innerHTML = `<span style="color:${colors[d.type]}">${d.type.toUpperCase()}</span>  ${d.label}<br><span style="color:#698fa8">${d.id}</span>${d.since ? '<br>since ' + d.since : ''}<br><span style="color:#698fa8;font-size:10px">click to open profile</span>`;
+    })
+    .on('mousemove', e => {
+      const r = wrap.getBoundingClientRect();
+      tip.style.left = (e.clientX - r.left + 14) + 'px';
+      tip.style.top  = (e.clientY - r.top  + 14) + 'px';
+    })
+    .on('mouseout', () => tip.style.display = 'none')
+    .on('click', (e, d) => {
+      // only fire on click, not after drag
+      if (e.defaultPrevented) return;
+      window.open(`https://steamcommunity.com/profiles/${d.id}`, '_blank');
+    });
+
+  sim.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+}
+
+window.addEventListener('load', initGraph);
+</script>
+</body>
+</html>
