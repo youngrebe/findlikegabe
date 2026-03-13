@@ -41,7 +41,7 @@ pip install -r requirements.txt
 ## 🔑 Setup
 
 ```bash
-# Get your Steam API key at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey)
+# Get your Steam API key at https://steamcommunity.com/dev/apikey
 python config.py
 ```
 
