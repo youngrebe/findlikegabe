@@ -12,18 +12,7 @@ Steam OSINT tool — collects and visualizes social connections of any Steam acc
   - **2nd** — checks friends-of-commentators
   - **3rd** — checks friends-of-friends-of-commentators
 - Fetches profile archive: nickname history, real name history, URL history, avatar history
-- Generates a self-contained **HTML report** with interactive D3 graph
-
----
-
-## 📄 Report includes
-
-| Tab | Content |
-|-----|---------|
-| Social Graph | Interactive force-directed graph, drag nodes, click → Steam profile |
-| Friends & Connections | Tables with avatar, nickname, SteamID, date |
-| Comments | All profile comments with author avatar, nickname, date |
-| Archive | Full history of nicknames, real names, URLs, avatars 
+- Generates a self-contained **HTML report** with interactive D3 grap
 
 ---
 
