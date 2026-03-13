@@ -1,4 +1,5 @@
 Steam OSINT tool — collects and visualizes social connections of any Steam account.
+
 ---
 
 ## 🔍 What it does
@@ -12,6 +13,7 @@ Steam OSINT tool — collects and visualizes social connections of any Steam acc
   - **3rd** — checks friends-of-friends-of-commentators
 - Fetches profile archive: nickname history, real name history, URL history, avatar history
 - Generates a self-contained **HTML report** with interactive D3 graph
+
 ---
 
 ## 📄 Report includes
@@ -22,6 +24,7 @@ Steam OSINT tool — collects and visualizes social connections of any Steam acc
 | Friends & Connections | Tables with avatar, nickname, SteamID, date |
 | Comments | All profile comments with author avatar, nickname, date |
 | Archive | Full history of nicknames, real names, URLs, avatars 
+
 ---
 
 ## ⚙️ Installation
@@ -32,6 +35,7 @@ cd findlikegabe
 python -m venv venv
 pip install -r requirements.txt
 ```
+
 ---
 
 ## 🔑 Setup
@@ -46,6 +50,7 @@ python config.py
     "token": "YOUR_STEAM_API_KEY"
 }
 ```
+
 ---
 
 ## 👻 Usage
