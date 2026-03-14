@@ -79,48 +79,82 @@ def GetProfileComments(steamID: str):
 
 # ======== ASYNC ======== #
 
-async def _fetch_json(session, url):
-    async with session.get(url) as resp:
-        return await resp.json(content_type=None)
+FRIENDLIST_URL = "http://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key={token}&steamid={steamID}&relationship=friend"
 
-async def _is_public(session, steamID):
-    url = f"http://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key={STEAM_API_TOKEN}&steamid={steamID}&relationship=friend"
-    async with session.get(url) as resp:
-        return resp.status != 401
+async def _fetch_friendlist(session, steamID, retries=3):
+    """
+    Single request → returns (is_public, friends).
+    - False, [] → private
+    - None, []  → failed after retries (skip safely)
+    - True, [...] → success
+    """
+    url = FRIENDLIST_URL.format(token=STEAM_API_TOKEN, steamID=steamID)
+    for attempt in range(retries):
+        try:
+            async with session.get(url) as resp:
+                if resp.status == 401:
+                    return False, []
+                if resp.status == 429:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                text = await resp.text()
+                if not text.strip():
+                    await asyncio.sleep(1 * (attempt + 1))
+                    continue
+                import json
+                data = json.loads(text)
+                friends = [
+                    FRIEND(f["steamid"], f["friend_since"])
+                    for f in data.get("friendslist", {}).get("friends", [])
+                ]
+                return True, friends
+        except Exception:
+            await asyncio.sleep(1 * (attempt + 1))
+    return None, []
 
-async def _get_friendlist(session, steamID):
-    url = f"http://api.steampowered.com/ISteamUser/GetFriendList/v0001/?key={STEAM_API_TOKEN}&steamid={steamID}&relationship=friend"
-    data = await _fetch_json(session, url)
-    friends = []
-    for f in data.get("friendslist", {}).get("friends", []):
-        friends.append(FRIEND(f["steamid"], f["friend_since"]))
-    return friends
-
-async def _get_summaries_chunk(session, ids):
-    string_ids = ",".join(map(str, ids))
-    url = f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={STEAM_API_TOKEN}&steamids={string_ids}"
-    data = await _fetch_json(session, url)
-    return data.get("response", {}).get("players", [])
+async def _fetch_summaries_chunk(session, ids, retries=3):
+    url = (
+        f"http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/"
+        f"?key={STEAM_API_TOKEN}&steamids={','.join(map(str, ids))}"
+    )
+    for attempt in range(retries):
+        try:
+            async with session.get(url) as resp:
+                if resp.status == 429:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
+                text = await resp.text()
+                if not text.strip():
+                    await asyncio.sleep(1 * (attempt + 1))
+                    continue
+                import json
+                data = json.loads(text)
+                return data.get("response", {}).get("players", [])
+        except Exception:
+            await asyncio.sleep(1 * (attempt + 1))
+    return []
 
 # ======== PUBLIC ======== #
 
 def IsFriendlistPublic(steamID):
     async def _run():
         async with aiohttp.ClientSession() as session:
-            return await _is_public(session, steamID)
+            is_public, _ = await _fetch_friendlist(session, steamID)
+            return bool(is_public)
     return asyncio.run(_run())
 
 def GetFriendlist(steamID):
     async def _run():
         async with aiohttp.ClientSession() as session:
-            return await _get_friendlist(session, steamID)
+            _, friends = await _fetch_friendlist(session, steamID)
+            return friends
     return asyncio.run(_run())
 
 async def GetPlayerSummariesAsync(steamIDs):
     if not steamIDs:
         return []
     async with aiohttp.ClientSession() as session:
-        tasks = [_get_summaries_chunk(session, steamIDs[i:i + 100]) for i in range(0, len(steamIDs), 100)]
+        tasks = [_fetch_summaries_chunk(session, steamIDs[i:i + 100]) for i in range(0, len(steamIDs), 100)]
         chunks = await asyncio.gather(*tasks)
     result = []
     for chunk in chunks:
@@ -133,62 +167,38 @@ def GetPlayerSummaries(steamIDs):
 # ======== HANDSHAKES ======== #
 
 async def _check_and_get(session, steamID, target_steamID):
-    if not await _is_public(session, steamID):
+    is_public, friends = await _fetch_friendlist(session, steamID)
+    if not is_public:
         return None
-    friends = await _get_friendlist(session, steamID)
-    return (steamID, friends)
+    return steamID, friends
+
+async def _run_handshake(candidate_ids, target_steamID, collect_friend_ids=False):
+    found_friends = []
+    collected_ids = []
+
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=30)) as session:
+        tasks = [_check_and_get(session, sid, target_steamID) for sid in candidate_ids]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for result in results:
+        if result is None or isinstance(result, Exception):
+            continue
+        steamID, friends = result
+        for friend in friends:
+            if friend.steamID == target_steamID:
+                found_friends.append(FRIEND(steamID, friend.friend_since))
+        if collect_friend_ids:
+            collected_ids.extend([f.steamID for f in friends])
+
+    if collect_friend_ids:
+        return found_friends, collected_ids
+    return found_friends
 
 async def resolve_handshake_1(commentator_ids, target_steamID):
-    found_friends = []
-    commentator_friend_ids = []
-
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=30)) as session:
-        tasks = [_check_and_get(session, sid, target_steamID) for sid in commentator_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for result in results:
-        if result is None or isinstance(result, Exception):
-            continue
-        steamID, friends = result
-        for friend in friends:
-            if friend.steamID == target_steamID:
-                found_friends.append(FRIEND(steamID, friend.friend_since))
-        commentator_friend_ids.extend([f.steamID for f in friends])
-
-    return found_friends, commentator_friend_ids
+    return await _run_handshake(commentator_ids, target_steamID, collect_friend_ids=True)
 
 async def resolve_handshake_2(candidate_ids, target_steamID):
-    found_friends = []
-    candidate_friend_ids = []
-
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=30)) as session:
-        tasks = [_check_and_get(session, sid, target_steamID) for sid in candidate_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for result in results:
-        if result is None or isinstance(result, Exception):
-            continue
-        steamID, friends = result
-        for friend in friends:
-            if friend.steamID == target_steamID:
-                found_friends.append(FRIEND(steamID, friend.friend_since))
-        candidate_friend_ids.extend([f.steamID for f in friends])
-
-    return found_friends, candidate_friend_ids
+    return await _run_handshake(candidate_ids, target_steamID, collect_friend_ids=True)
 
 async def resolve_handshake_3(candidate_ids, target_steamID):
-    found_friends = []
-
-    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=30)) as session:
-        tasks = [_check_and_get(session, sid, target_steamID) for sid in candidate_ids]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for result in results:
-        if result is None or isinstance(result, Exception):
-            continue
-        steamID, friends = result
-        for friend in friends:
-            if friend.steamID == target_steamID:
-                found_friends.append(FRIEND(steamID, friend.friend_since))
-
-    return found_friends
+    return await _run_handshake(candidate_ids, target_steamID, collect_friend_ids=False)
