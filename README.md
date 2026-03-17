@@ -15,9 +15,11 @@
 ## ⚙️ Installation
 
 ```bash
+# Git
 git clone https://github.com/youngrebe/findlikegabe
 cd findlikegabe
 
+# Requirements
 python -m venv venv
 pip install -r requirements.txt
 ```
