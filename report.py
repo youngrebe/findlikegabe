@@ -15,6 +15,7 @@ def generate_report(
     FRIEND_SUMMARIES,
     CONNECTION_SUMMARIES,
     COMMENTS,
+    TARGET_COMMENTS_ON_CONNECTIONS,  # list of (profile_steamID, COMMENT)
 ):
     os.makedirs("reports", exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -25,314 +26,402 @@ def generate_report(
         if target_creation_date
         else "Unknown"
     )
-    report_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    report_time = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # ── Graph nodes / links ──────────────────────────────────────────────────
-    nodes = [
-        {
-            "id": target_steamID,
-            "label": target_nickname,
-            "avatar": target_avatar,
-            "type": "target",
-        }
-    ]
+    # ── Graph data ───────────────────────────────────────────────────────────────
+    nodes = [{"id": target_steamID, "label": target_nickname, "avatar": target_avatar, "type": "target"}]
     links = []
     seen = {target_steamID}
 
     for s in FRIEND_SUMMARIES:
         if s.steamID not in seen:
-            nodes.append(
-                {
-                    "id": s.steamID,
-                    "label": s.nickname,
-                    "avatar": s.avatar,
-                    "type": "friend",
-                    "since": s.since,
-                }
-            )
+            nodes.append({"id": s.steamID, "label": s.nickname, "avatar": s.avatar, "type": "friend", "since": s.since})
             seen.add(s.steamID)
         links.append({"source": target_steamID, "target": s.steamID, "type": "friend"})
 
     for s in CONNECTION_SUMMARIES:
         if s.steamID not in seen:
-            nodes.append(
-                {
-                    "id": s.steamID,
-                    "label": s.nickname,
-                    "avatar": s.avatar,
-                    "type": "connection",
-                    "since": s.since,
-                }
-            )
+            nodes.append({"id": s.steamID, "label": s.nickname, "avatar": s.avatar, "type": "connection", "since": s.since})
             seen.add(s.steamID)
-        links.append(
-            {"source": target_steamID, "target": s.steamID, "type": "connection"}
-        )
+        links.append({"source": target_steamID, "target": s.steamID, "type": "connection"})
 
     graph_json = json.dumps({"nodes": nodes, "links": links})
 
-    # ── HTML helpers ─────────────────────────────────────────────────────────
-    def archive_rows(items, val_attr):
-        if not items:
-            return '<tr><td colspan="2" class="empty-cell">- no data -</td></tr>'
-        out = ""
-        for item in items:
-            val = getattr(item, val_attr, "")
-            date = getattr(item, "date", "")
-            out += f"<tr><td>{val}</td><td class='mono dim'>{date}</td></tr>"
-        return out
-
-    def avatar_grid():
-        if not ARCHIVE_AVATARS:
-            return '<p class="empty-cell">- no data -</p>'
-        out = '<div class="avatar-grid">'
-        for av in ARCHIVE_AVATARS:
-            out += f'<div class="av-item"><img src="{av.url}" alt=""><span class="mono">{av.date}</span></div>'
-        out += "</div>"
-        return out
-
+    # ── Helpers ──────────────────────────────────────────────────────────────────
     def fmt_ts(ts):
         try:
             return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M")
         except (ValueError, TypeError, OSError):
             return str(ts)
 
-    # lookup: steamID → (nickname, avatar)
+    # steamID → (nickname, avatar) for all known people
     known = {}
     for s in FRIEND_SUMMARIES + CONNECTION_SUMMARIES:
         known[s.steamID] = (s.nickname, s.avatar)
 
-    def comments_html():
-        if not COMMENTS:
-            return '<p class="empty-cell">- no comments found -</p>'
+    def archive_rows(items, val_attr):
+        if not items:
+            return '<tr><td colspan="2" class="empty">— no data —</td></tr>'
         out = ""
-        for c in COMMENTS:
+        for item in items:
+            val = getattr(item, val_attr, "")
+            date = getattr(item, "date", "")
+            out += f'<tr><td>{val}</td><td class="mono muted">{date}</td></tr>'
+        return out
+
+    def avatar_grid():
+        if not ARCHIVE_AVATARS:
+            return '<p class="empty">— no data —</p>'
+        out = '<div class="av-grid">'
+        for av in ARCHIVE_AVATARS:
+            out += f'<div class="av-item"><img src="{av.url}" alt=""><span class="mono muted">{av.date}</span></div>'
+        out += "</div>"
+        return out
+
+    def render_comments(comment_list):
+        """Render list of COMMENT objects (comments on target's own profile)."""
+        if not comment_list:
+            return '<p class="empty">— no comments —</p>'
+        out = '<div class="comment-list">'
+        for c in comment_list:
             text = str(c.text).replace("<", "&lt;").replace(">", "&gt;")
             date = fmt_ts(c.publishedAt)
             nickname, avatar = known.get(c.authorID, (c.authorID, None))
-            ava_html = f'<img src="{avatar}" class="comment-ava">' if avatar else f'<div class="comment-ava-placeholder"></div>'
+            ava_html = f'<img src="{avatar}" class="c-ava">' if avatar else '<div class="c-ava c-ava-ph"></div>'
             profile_url = f"https://steamcommunity.com/profiles/{c.authorID}"
-            out += f"""
-            <div class="comment-card">
-                <div class="comment-header">
-                    <a href="{profile_url}" target="_blank" class="comment-profile-link">{ava_html}</a>
-                    <div class="comment-author">
-                        <a href="{profile_url}" target="_blank" class="comment-nick">{nickname}</a>
-                        <span class="mono dim" style="font-size:10px">{c.authorID}</span>
-                    </div>
-                    <span class="mono dim" style="margin-left:auto">{date}</span>
-                </div>
-                <div class="comment-body">{text}</div>
-            </div>"""
+            out += f"""<div class="c-card">
+  <div class="c-head">
+    <a href="{profile_url}" target="_blank">{ava_html}</a>
+    <div class="c-meta">
+      <a href="{profile_url}" target="_blank" class="c-nick">{nickname}</a>
+      <span class="mono muted xs">{c.authorID}</span>
+    </div>
+    <span class="mono muted xs ml-auto">{date}</span>
+  </div>
+  <div class="c-body">{text}</div>
+</div>"""
+        out += "</div>"
+        return out
+
+    def render_target_comments(entries):
+        """
+        Render TARGET_COMMENTS_ON_CONNECTIONS.
+        entries: list of (profile_steamID, COMMENT)
+        Groups by profile and shows where the target left each comment.
+        """
+        if not entries:
+            return '<p class="empty">— no comments found —</p>'
+
+        out = '<div class="comment-list">'
+        for profile_id, c in entries:
+            text = str(c.text).replace("<", "&lt;").replace(">", "&gt;")
+            date = fmt_ts(c.publishedAt)
+            # Profile that was commented on
+            profile_nickname, profile_avatar = known.get(profile_id, (profile_id, None))
+            p_ava = f'<img src="{profile_avatar}" class="c-ava">' if profile_avatar else '<div class="c-ava c-ava-ph"></div>'
+            profile_url = f"https://steamcommunity.com/profiles/{profile_id}"
+            out += f"""<div class="c-card tc-card">
+  <div class="tc-on">
+    on <a href="{profile_url}" target="_blank" class="tc-profile-link">{p_ava}<span>{profile_nickname}</span></a>
+    <span class="mono muted xs ml-auto">{date}</span>
+  </div>
+  <div class="c-body">{text}</div>
+</div>"""
+        out += "</div>"
         return out
 
     def people_rows(summaries, kind, color):
         if not summaries:
-            return f'<tr><td colspan="5" class="empty-cell">- no {kind}s -</td></tr>'
+            return f'<tr><td colspan="5" class="empty">— no {kind}s —</td></tr>'
         out = ""
         for s in summaries:
-            out += f"""
-            <tr>
-                <td><img src="{s.avatar}" class="row-avatar"></td>
-                <td>{s.nickname}</td>
-                <td class="mono dim" style="font-size:11px">{s.steamID}</td>
-                <td class="mono dim">{s.since}</td>
-                <td><span class="badge" style="background:{color}22;border-color:{color};color:{color}">{kind}</span></td>
-            </tr>"""
+            out += f"""<tr>
+  <td><img src="{s.avatar}" class="r-ava"></td>
+  <td>{s.nickname}</td>
+  <td class="mono muted xs">{s.steamID}</td>
+  <td class="mono muted">{s.since}</td>
+  <td><span class="badge" style="--c:{color}">{kind}</span></td>
+</tr>"""
         return out
 
-    # ── HTML ─────────────────────────────────────────────────────────────────
+    # ── HTML ─────────────────────────────────────────────────────────────────────
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{target_nickname}</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>{target_nickname} — OSINT</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
-*{{box-sizing:border-box;margin:0;padding:0}}
+*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
-:root{{
-  --bg:#0e1419;--bg2:#171d25;--bg3:#1e2a35;
-  --panel:#1b2838;--border:#2a475e;
-  --accent:#66c0f4;--accent2:#1b9bd1;
-  --gold:#c6a850;--green:#a4d007;--red:#c94040;
-  --text:#c7d5e0;--dim:#698fa8;
+:root {{
+  --bg:    #0d0d0d;
+  --bg1:   #111111;
+  --bg2:   #161616;
+  --bg3:   #1a1a1a;
+  --line:  #222222;
+  --line2: #2a2a2a;
+  --text:  #d4d4d4;
+  --muted: #555555;
+  --acc:   #e8e8e8;
+  --green: #4ade80;
+  --blue:  #60a5fa;
+  --amber: #fbbf24;
+  --red:   #f87171;
+  --purple:#c084fc;
 }}
 
-body{{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-weight:400;line-height:1.5;min-height:100vh}}
-body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.05) 3px,rgba(0,0,0,.05) 4px);pointer-events:none;z-index:9999}}
+body {{
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.6;
+  min-height: 100vh;
+}}
 
-/* HEADER */
-.header{{background:linear-gradient(160deg,#0a1520 0%,#1b2838 40%,#0f1c28 100%);border-bottom:2px solid var(--border);position:relative;overflow:hidden}}
-.hglow{{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:700px;height:180px;background:radial-gradient(ellipse,rgba(102,192,244,.1) 0%,transparent 70%);pointer-events:none}}
-.header-inner{{max-width:1380px;margin:0 auto;padding:32px 40px;display:flex;align-items:center;gap:28px;position:relative;z-index:1}}
-.target-ava{{width:96px;height:96px;border:3px solid var(--gold);box-shadow:0 0 0 1px rgba(198,168,80,.25),0 0 28px rgba(198,168,80,.2);flex-shrink:0;image-rendering:pixelated}}
-.header-text h1{{font-family:'Rajdhani',sans-serif;font-size:36px;font-weight:700;color:#fff;letter-spacing:.5px;line-height:1}}
-.steam-id{{font-family:'Share Tech Mono',monospace;color:var(--accent);font-size:12px;margin-top:5px;letter-spacing:.5px}}
-.chips{{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}}
-.chip{{font-family:'Share Tech Mono',monospace;font-size:11px;padding:3px 10px;border:1px solid var(--border);background:rgba(102,192,244,.06);color:var(--dim)}}
-.chip b{{color:var(--accent)}}
-.header-ts{{margin-left:auto;text-align:right;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--dim);line-height:2;flex-shrink:0}}
-.ts-lbl{{color:var(--accent);display:block;font-size:10px;letter-spacing:1px}}
+a {{ color: inherit; text-decoration: none; }}
+.mono {{ font-family: 'JetBrains Mono', monospace; }}
+.muted {{ color: var(--muted); }}
+.xs {{ font-size: 11px; }}
+.ml-auto {{ margin-left: auto; }}
 
-/* STATS */
-.statsbar{{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 40px;display:flex;justify-content:center;gap:50px;flex-wrap:wrap}}
-.stat{{display:flex;flex-direction:column;align-items:center;gap:2px}}
-.stat-n{{font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;line-height:1}}
-.stat-n.gold{{color:var(--gold)}}.stat-n.green{{color:var(--green)}}.stat-n.blue{{color:var(--accent)}}.stat-n.red{{color:var(--red)}}
-.stat-l{{font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}}
+/* ── HEADER ── */
+.hdr {{
+  border-bottom: 1px solid var(--line);
+  background: var(--bg1);
+  padding: 24px 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}}
+.hdr-ava {{
+  width: 56px; height: 56px;
+  border: 1px solid var(--line2);
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}}
+.hdr-name {{ font-size: 20px; font-weight: 600; color: var(--acc); line-height: 1.2; }}
+.hdr-id {{ font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 3px; }}
+.hdr-chips {{ display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }}
+.chip {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--line2);
+  color: var(--muted);
+  letter-spacing: .5px;
+}}
+.chip b {{ color: var(--text); font-weight: 500; }}
+.hdr-ts {{ margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); text-align: right; flex-shrink: 0; }}
 
-/* NAV */
-.nav{{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;justify-content:center;padding:0 40px;overflow-x:auto}}
-.nav-tab{{font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:14px 20px;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s;user-select:none}}
-.nav-tab:hover{{color:var(--text)}}
-.nav-tab.active{{color:var(--accent);border-bottom-color:var(--accent)}}
+/* ── STATS BAR ── */
+.stats {{ background: var(--bg1); border-bottom: 1px solid var(--line); display: flex; justify-content: center; }}
+.stat {{
+  padding: 14px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-right: 1px solid var(--line);
+}}
+.stat:first-child {{ border-left: 1px solid var(--line); }}
+.stat-n {{ font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500; line-height: 1; }}
+.stat-n.g {{ color: var(--green); }}
+.stat-n.b {{ color: var(--blue); }}
+.stat-n.a {{ color: var(--amber); }}
+.stat-n.r {{ color: var(--red); }}
+.stat-n.p {{ color: var(--purple); }}
+.stat-l {{ font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }}
 
-/* PAGES */
-.page{{display:none;max-width:1380px;margin:0 auto;padding:28px 40px}}
-.page.active{{display:block}}
+/* ── NAV ── */
+.nav {{ background: var(--bg1); border-bottom: 1px solid var(--line); display: flex; justify-content: center; padding: 0 40px; overflow-x: auto; }}
+.nav-tab {{
+  font-size: 11px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 12px 16px; color: var(--muted); cursor: pointer;
+  border-bottom: 1px solid transparent; white-space: nowrap;
+  transition: color .15s, border-color .15s; user-select: none;
+  font-family: 'JetBrains Mono', monospace;
+}}
+.nav-tab:hover {{ color: var(--text); }}
+.nav-tab.active {{ color: var(--acc); border-bottom-color: var(--acc); }}
 
-/* PANEL */
-.panel{{background:var(--bg2);border:1px solid var(--border);margin-bottom:20px;position:relative}}
-.panel::before{{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent 70%)}}
-.panel-title{{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--accent);padding:13px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}}
-.panel-title::before{{content:'';width:7px;height:7px;background:var(--accent);clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);flex-shrink:0}}
-.panel-body{{padding:20px}}
+/* ── PAGES ── */
+.page {{ display: none; max-width: 1400px; margin: 0 auto; padding: 28px 40px; }}
+.page.active {{ display: block; }}
 
-/* GRAPH */
-#graph-wrap{{background:var(--bg);border:1px solid var(--border);position:relative;height:580px;overflow:hidden}}
-#graph-svg{{width:100%;height:100%}}
-.graph-legend{{position:absolute;bottom:14px;left:14px;display:flex;gap:14px;flex-wrap:wrap}}
-.leg-item{{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);font-family:'Share Tech Mono',monospace}}
-.leg-dot{{width:9px;height:9px;border-radius:50%}}
-.gtip{{position:absolute;background:var(--panel);border:1px solid var(--border);padding:8px 12px;font-size:12px;font-family:'Share Tech Mono',monospace;pointer-events:none;display:none;white-space:nowrap;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.5)}}
+/* ── SECTION ── */
+.section {{ background: var(--bg1); border: 1px solid var(--line); margin-bottom: 16px; }}
+.section-title {{
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); padding: 10px 16px; border-bottom: 1px solid var(--line);
+}}
+.section-body {{ padding: 16px; }}
+.section-body.flush {{ padding: 0; overflow-x: auto; }}
 
-/* TABLES */
-.data-table{{width:100%;border-collapse:collapse}}
-.data-table th{{font-family:'Rajdhani',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim);padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}}
-.data-table td{{padding:8px 12px;border-bottom:1px solid rgba(42,71,94,.5);vertical-align:middle}}
-.data-table tr:last-child td{{border-bottom:none}}
-.data-table tr:hover td{{background:rgba(102,192,244,.04)}}
-.row-avatar{{width:32px;height:32px;border:1px solid var(--border)}}
-.badge{{display:inline-block;padding:2px 8px;font-size:10px;border:1px solid;font-family:'Share Tech Mono',monospace;letter-spacing:.5px}}
+/* ── GRAPH ── */
+#graph-wrap {{ background: var(--bg); border: 1px solid var(--line); position: relative; height: 600px; overflow: hidden; }}
+#graph-svg {{ width: 100%; height: 100%; }}
+.g-legend {{ position: absolute; bottom: 12px; left: 12px; display: flex; gap: 12px; }}
+.g-leg {{ display: flex; align-items: center; gap: 5px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); }}
+.g-dot {{ width: 7px; height: 7px; border-radius: 50%; }}
+.gtip {{ position: absolute; background: var(--bg2); border: 1px solid var(--line2); padding: 8px 12px; font-size: 11px; font-family: 'JetBrains Mono', monospace; pointer-events: none; display: none; white-space: nowrap; z-index: 10; }}
 
-/* ARCHIVE */
-.two-col{{display:grid;grid-template-columns:1fr 1fr;gap:20px}}
-.avatar-grid{{display:flex;flex-wrap:wrap;gap:12px}}
-.av-item{{display:flex;flex-direction:column;align-items:center;gap:4px}}
-.av-item img{{width:64px;height:64px;border:1px solid var(--border);image-rendering:pixelated}}
-.av-item span{{font-size:10px;color:var(--dim)}}
+/* ── TABLE ── */
+.tbl {{ width: 100%; border-collapse: collapse; }}
+.tbl th {{ font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 8px 14px; border-bottom: 1px solid var(--line); text-align: left; }}
+.tbl td {{ padding: 7px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--text); }}
+.tbl tr:last-child td {{ border-bottom: none; }}
+.tbl tr:hover td {{ background: var(--bg2); }}
+.r-ava {{ width: 28px; height: 28px; border: 1px solid var(--line); image-rendering: pixelated; }}
+.badge {{ font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .5px; padding: 2px 7px; border: 1px solid var(--c, #555); color: var(--c, #555); }}
 
-/* COMMENTS */
-.comments-grid{{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
-.comment-card{{background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--accent2);padding:12px 14px}}
-.comment-header{{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px}}
-.comment-ava{{width:28px;height:28px;border:1px solid var(--border);flex-shrink:0;image-rendering:pixelated}}
-.comment-ava-placeholder{{width:28px;height:28px;background:var(--border);flex-shrink:0}}
-.comment-author{{display:flex;flex-direction:column;gap:1px;min-width:0}}
-.comment-nick{{color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}}
-.comment-nick:hover{{color:#fff;text-decoration:underline}}
-.comment-profile-link{{display:flex;flex-shrink:0}}
-.comment-profile-link:hover .comment-ava{{border-color:var(--accent);box-shadow:0 0 8px rgba(102,192,244,.4)}}
-.comment-body{{font-size:13px;color:var(--text);line-height:1.4;white-space:pre-wrap;word-break:break-word}}
+/* ── 2-COL ── */
+.two-col {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
 
-/* UTILS */
-.mono{{font-family:'Share Tech Mono',monospace}}
-.dim{{color:var(--dim)}}
-.accent{{color:var(--accent)}}
-.empty-cell{{text-align:center;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:12px;padding:20px}}
+/* ── AVATAR GRID ── */
+.av-grid {{ display: flex; flex-wrap: wrap; gap: 10px; }}
+.av-item {{ display: flex; flex-direction: column; align-items: center; gap: 4px; }}
+.av-item img {{ width: 56px; height: 56px; border: 1px solid var(--line); image-rendering: pixelated; }}
+.av-item span {{ font-size: 10px; color: var(--muted); }}
 
-@media(max-width:900px){{
-  .header-inner,.statsbar,.nav,.page{{padding-left:16px;padding-right:16px}}
-  .two-col,.comments-grid{{grid-template-columns:1fr}}
-  .header-ts{{display:none}}
+/* ── COMMENTS ── */
+.comment-list {{ display: flex; flex-direction: column; gap: 1px; }}
+.c-card {{ background: var(--bg1); border: 1px solid var(--line); padding: 12px 14px; margin-bottom: 1px; }}
+.c-card:last-child {{ margin-bottom: 0; }}
+.c-head {{ display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }}
+.c-ava {{ width: 26px; height: 26px; border: 1px solid var(--line); flex-shrink: 0; image-rendering: pixelated; }}
+.c-ava-ph {{ background: var(--bg3); }}
+.c-meta {{ display: flex; flex-direction: column; gap: 1px; min-width: 0; }}
+.c-nick {{ font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--acc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.c-nick:hover {{ text-decoration: underline; }}
+.c-body {{ font-size: 12px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; }}
+
+/* ── TARGET COMMENTS ── */
+.tc-card {{ border-left: 2px solid var(--purple); }}
+.tc-on {{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}}
+.tc-profile-link {{
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--purple);
+}}
+.tc-profile-link:hover span {{ text-decoration: underline; }}
+.tc-profile-link .c-ava {{ border-color: var(--purple)33; }}
+
+/* ── MISC ── */
+.empty {{ text-align: center; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 24px; }}
+
+@media (max-width: 900px) {{
+  .hdr, .stats, .nav, .page {{ padding-left: 16px; padding-right: 16px; }}
+  .two-col {{ grid-template-columns: 1fr; }}
+  .hdr-ts {{ display: none; }}
+  .stat {{ padding: 12px 16px; }}
 }}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="hglow"></div>
-  <div class="header-inner">
-    <img class="target-ava" src="{target_avatar}" alt="avatar">
-    <div class="header-text">
-      <h1>{target_nickname}</h1>
-      <div class="steam-id">{target_steamID}</div>
-      <div class="chips">
-        <span class="chip">CREATED <b>{creation_str}</b></span>
-        <span class="chip">FRIENDS <b>{len(FRIEND_SUMMARIES)}</b></span>
-        <span class="chip">CONNECTIONS <b>{len(CONNECTION_SUMMARIES)}</b></span>
-        <span class="chip">COMMENTS <b>{len(COMMENTS)}</b></span>
-      </div>
-    </div>
-    <div class="header-ts">
-      <span class="ts-lbl">REPORT GENERATED</span>
-      {report_time}<br>FINDLIKEGABE
+<!-- HEADER -->
+<div class="hdr">
+  <img class="hdr-ava" src="{target_avatar}" alt="">
+  <div>
+    <div class="hdr-name">{target_nickname}</div>
+    <div class="hdr-id">{target_steamID}</div>
+    <div class="hdr-chips">
+      <span class="chip">CREATED <b>{creation_str}</b></span>
+      <span class="chip">FRIENDS <b>{len(FRIEND_SUMMARIES)}</b></span>
+      <span class="chip">CONNECTIONS <b>{len(CONNECTION_SUMMARIES)}</b></span>
+      <span class="chip">COMMENTS <b>{len(COMMENTS)}</b></span>
     </div>
   </div>
+  <div class="hdr-ts">FINDLIKEGABE<br>{report_time}</div>
 </div>
 
-<div class="statsbar">
-  <div class="stat"><span class="stat-n gold">{len(FRIEND_SUMMARIES)}</span><span class="stat-l">Friends</span></div>
-  <div class="stat"><span class="stat-n blue">{len(CONNECTION_SUMMARIES)}</span><span class="stat-l">Connections</span></div>
-  <div class="stat"><span class="stat-n green">{len(COMMENTS)}</span><span class="stat-l">Comments</span></div>
-  <div class="stat"><span class="stat-n red">{len(ARCHIVE_NICKNAMES)}</span><span class="stat-l">Name History</span></div>
-  <div class="stat"><span class="stat-n gold">{len(ARCHIVE_AVATARS)}</span><span class="stat-l">Avatar History</span></div>
-  <div class="stat"><span class="stat-n blue">{len(nodes)}</span><span class="stat-l">Graph Nodes</span></div>
+<!-- STATS -->
+<div class="stats">
+  <div class="stat"><span class="stat-n a">{len(FRIEND_SUMMARIES)}</span><span class="stat-l">Friends</span></div>
+  <div class="stat"><span class="stat-n b">{len(CONNECTION_SUMMARIES)}</span><span class="stat-l">Connections</span></div>
+  <div class="stat"><span class="stat-n g">{len(COMMENTS)}</span><span class="stat-l">Comments</span></div>
+  <div class="stat"><span class="stat-n p">{len(TARGET_COMMENTS_ON_CONNECTIONS)}</span><span class="stat-l">Target's Comments</span></div>
+  <div class="stat"><span class="stat-n r">{len(ARCHIVE_NICKNAMES)}</span><span class="stat-l">Nick History</span></div>
+  <div class="stat"><span class="stat-n a">{len(ARCHIVE_AVATARS)}</span><span class="stat-l">Avatar History</span></div>
 </div>
 
+<!-- NAV -->
 <div class="nav">
-  <div class="nav-tab active" data-tab="graph">SOCMINT</div>
-  <div class="nav-tab" data-tab="friends">Friends &amp; Connections</div>
+  <div class="nav-tab active" data-tab="graph">Graph</div>
+  <div class="nav-tab" data-tab="people">Friends &amp; Connections</div>
   <div class="nav-tab" data-tab="comments">Comments</div>
+  <div class="nav-tab" data-tab="target-comments">Target's Comments <span style="color:var(--purple)">({len(TARGET_COMMENTS_ON_CONNECTIONS)})</span></div>
   <div class="nav-tab" data-tab="archive">Archive</div>
 </div>
 
 <!-- GRAPH -->
 <div class="page active" id="tab-graph">
-  <div class="panel">
-    <div class="panel-title">Social Connection Graph - {len(nodes)} nodes / {len(links)} edges</div>
+  <div class="section">
+    <div class="section-title">Social graph — {len(nodes)} nodes / {len(links)} edges</div>
     <div id="graph-wrap">
       <svg id="graph-svg"></svg>
-      <div class="graph-legend">
-        <div class="leg-item"><div class="leg-dot" style="background:#c6a850"></div>Target</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#a4d007"></div>Friend</div>
-        <div class="leg-item"><div class="leg-dot" style="background:#66c0f4"></div>Connection</div>
+      <div class="g-legend">
+        <div class="g-leg"><div class="g-dot" style="background:var(--amber)"></div>Target</div>
+        <div class="g-leg"><div class="g-dot" style="background:var(--green)"></div>Friend</div>
+        <div class="g-leg"><div class="g-dot" style="background:var(--blue)"></div>Connection</div>
       </div>
       <div class="gtip" id="gtip"></div>
     </div>
   </div>
 </div>
 
-<!-- FRIENDS -->
-<div class="page" id="tab-friends">
-  <div class="panel">
-    <div class="panel-title">Friends ({len(FRIEND_SUMMARIES)})</div>
-    <div class="panel-body" style="padding:0;overflow-x:auto">
-      <table class="data-table">
+<!-- PEOPLE -->
+<div class="page" id="tab-people">
+  <div class="section">
+    <div class="section-title">Friends ({len(FRIEND_SUMMARIES)})</div>
+    <div class="section-body flush">
+      <table class="tbl">
         <thead><tr><th></th><th>Nickname</th><th>SteamID</th><th>Friends Since</th><th>Type</th></tr></thead>
-        <tbody>{people_rows(FRIEND_SUMMARIES,'friend','#a4d007')}</tbody>
+        <tbody>{people_rows(FRIEND_SUMMARIES, 'friend', '#4ade80')}</tbody>
       </table>
     </div>
   </div>
-  <div class="panel">
-    <div class="panel-title">Connections ({len(CONNECTION_SUMMARIES)})</div>
-    <div class="panel-body" style="padding:0;overflow-x:auto">
-      <table class="data-table">
+  <div class="section">
+    <div class="section-title">Connections ({len(CONNECTION_SUMMARIES)})</div>
+    <div class="section-body flush">
+      <table class="tbl">
         <thead><tr><th></th><th>Nickname</th><th>SteamID</th><th>Since</th><th>Type</th></tr></thead>
-        <tbody>{people_rows(CONNECTION_SUMMARIES,'connection','#66c0f4')}</tbody>
+        <tbody>{people_rows(CONNECTION_SUMMARIES, 'connection', '#60a5fa')}</tbody>
       </table>
     </div>
   </div>
 </div>
 
-<!-- COMMENTS -->
+<!-- COMMENTS ON TARGET'S PROFILE -->
 <div class="page" id="tab-comments">
-  <div class="panel">
-    <div class="panel-title">Profile Comments ({len(COMMENTS)})</div>
-    <div class="panel-body">
-      <div class="comments-grid">{comments_html()}</div>
+  <div class="section">
+    <div class="section-title">Comments on target's profile ({len(COMMENTS)})</div>
+    <div class="section-body">
+      {render_comments(COMMENTS)}
+    </div>
+  </div>
+</div>
+
+<!-- TARGET'S OWN COMMENTS ON CONNECTIONS -->
+<div class="page" id="tab-target-comments">
+  <div class="section">
+    <div class="section-title">Comments left by target on connections' profiles ({len(TARGET_COMMENTS_ON_CONNECTIONS)})</div>
+    <div class="section-body">
+      {render_target_comments(TARGET_COMMENTS_ON_CONNECTIONS)}
     </div>
   </div>
 </div>
@@ -340,44 +429,44 @@ body::after{{content:'';position:fixed;inset:0;background:repeating-linear-gradi
 <!-- ARCHIVE -->
 <div class="page" id="tab-archive">
   <div class="two-col">
-    <div class="panel">
-      <div class="panel-title">Nickname History ({len(ARCHIVE_NICKNAMES)})</div>
-      <div class="panel-body" style="padding:0;overflow-x:auto">
-        <table class="data-table">
+    <div class="section">
+      <div class="section-title">Nickname history ({len(ARCHIVE_NICKNAMES)})</div>
+      <div class="section-body flush">
+        <table class="tbl">
           <thead><tr><th>Nickname</th><th>Date</th></tr></thead>
-          <tbody>{archive_rows(ARCHIVE_NICKNAMES,'nickname')}</tbody>
+          <tbody>{archive_rows(ARCHIVE_NICKNAMES, 'nickname')}</tbody>
         </table>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Real Name History ({len(ARCHIVE_REAL_NAMES)})</div>
-      <div class="panel-body" style="padding:0;overflow-x:auto">
-        <table class="data-table">
+    <div class="section">
+      <div class="section-title">Real name history ({len(ARCHIVE_REAL_NAMES)})</div>
+      <div class="section-body flush">
+        <table class="tbl">
           <thead><tr><th>Real Name</th><th>Date</th></tr></thead>
-          <tbody>{archive_rows(ARCHIVE_REAL_NAMES,'realname')}</tbody>
+          <tbody>{archive_rows(ARCHIVE_REAL_NAMES, 'realname')}</tbody>
         </table>
       </div>
     </div>
   </div>
   <div class="two-col">
-    <div class="panel">
-      <div class="panel-title">URL History ({len(ARCHIVE_URLS)})</div>
-      <div class="panel-body" style="padding:0;overflow-x:auto">
-        <table class="data-table">
+    <div class="section">
+      <div class="section-title">URL history ({len(ARCHIVE_URLS)})</div>
+      <div class="section-body flush">
+        <table class="tbl">
           <thead><tr><th>URL</th><th>Date</th></tr></thead>
-          <tbody>{archive_rows(ARCHIVE_URLS,'url')}</tbody>
+          <tbody>{archive_rows(ARCHIVE_URLS, 'url')}</tbody>
         </table>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-title">Avatar History ({len(ARCHIVE_AVATARS)})</div>
-      <div class="panel-body">{avatar_grid()}</div>
+    <div class="section">
+      <div class="section-title">Avatar history ({len(ARCHIVE_AVATARS)})</div>
+      <div class="section-body">{avatar_grid()}</div>
     </div>
   </div>
 </div>
 
 <script>
-// ── Tabs ─────────────────────────────────────────────────────────────────────
+// ── Tabs ────────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.nav-tab').forEach(tab => {{
   tab.addEventListener('click', () => {{
     const name = tab.dataset.tab;
@@ -389,7 +478,7 @@ document.querySelectorAll('.nav-tab').forEach(tab => {{
   }});
 }});
 
-// ── D3 Graph ──────────────────────────────────────────────────────────────────
+// ── D3 Graph ────────────────────────────────────────────────────────────────────
 const GRAPH = {graph_json};
 let graphInited = false;
 
@@ -400,34 +489,24 @@ function initGraph() {{
   const wrap = document.getElementById('graph-wrap');
   const W = wrap.clientWidth, H = wrap.clientHeight;
   const tip = document.getElementById('gtip');
-  const colors = {{ target: '#c6a850', friend: '#a4d007', connection: '#66c0f4' }};
+  const C = {{ target: '#fbbf24', friend: '#4ade80', connection: '#60a5fa' }};
 
   const svg = d3.select('#graph-svg');
   const g   = svg.append('g');
 
-  svg.call(
-    d3.zoom().scaleExtent([.15, 4])
-      .on('zoom', e => g.attr('transform', e.transform))
-  );
+  svg.call(d3.zoom().scaleExtent([.1, 5]).on('zoom', e => g.attr('transform', e.transform)));
 
   const sim = d3.forceSimulation(GRAPH.nodes)
-    .force('link',    d3.forceLink(GRAPH.links).id(d => d.id).distance(d => d.type === 'friend' ? 110 : 150).strength(.5))
-    .force('charge',  d3.forceManyBody().strength(-350))
+    .force('link',    d3.forceLink(GRAPH.links).id(d => d.id).distance(d => d.type === 'friend' ? 100 : 140).strength(.5))
+    .force('charge',  d3.forceManyBody().strength(-300))
     .force('center',  d3.forceCenter(W / 2, H / 2))
-    .force('collide', d3.forceCollide(24));
+    .force('collide', d3.forceCollide(20));
 
   const defs = svg.append('defs');
 
-  // Gradient for links
-  defs.append('marker').attr('id','arr-f').attr('viewBox','0 -4 8 8').attr('refX',18).attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
-    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','#a4d00766');
-  defs.append('marker').attr('id','arr-c').attr('viewBox','0 -4 8 8').attr('refX',16).attr('markerWidth',5).attr('markerHeight',5).attr('orient','auto')
-    .append('path').attr('d','M0,-4L8,0L0,4').attr('fill','#66c0f455');
-
   const link = g.append('g').selectAll('line').data(GRAPH.links).join('line')
-    .attr('stroke',       d => d.type === 'friend' ? '#a4d00760' : '#66c0f445')
-    .attr('stroke-width', d => d.type === 'friend' ? 1.5 : 1)
-    .attr('marker-end',   d => d.type === 'friend' ? 'url(#arr-f)' : 'url(#arr-c)');
+    .attr('stroke', d => d.type === 'friend' ? '#4ade8030' : '#60a5fa25')
+    .attr('stroke-width', 1);
 
   const node = g.append('g').selectAll('g').data(GRAPH.nodes).join('g')
     .attr('cursor', 'pointer')
@@ -437,47 +516,36 @@ function initGraph() {{
       .on('end',   (e, d) => {{ if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; }})
     );
 
-  // Outer glow ring for target
-  node.filter(d => d.type === 'target').append('circle')
-    .attr('r', 30).attr('fill', 'none')
-    .attr('stroke', '#c6a850').attr('stroke-width', 1).attr('opacity', .35)
-    .attr('stroke-dasharray', '4 3');
-
-  // Main circle
   node.append('circle')
-    .attr('r', d => d.type === 'target' ? 22 : 13)
-    .attr('fill',         d => colors[d.type] + '20')
-    .attr('stroke',       d => colors[d.type])
-    .attr('stroke-width', d => d.type === 'target' ? 2.5 : 1.5);
+    .attr('r', d => d.type === 'target' ? 20 : 12)
+    .attr('fill', 'none')
+    .attr('stroke', d => C[d.type])
+    .attr('stroke-width', d => d.type === 'target' ? 1.5 : 1);
 
-  // Clip paths for avatars
   GRAPH.nodes.forEach((d, i) => {{
-    const r = d.type === 'target' ? 20 : 11;
+    const r = d.type === 'target' ? 18 : 10;
     defs.append('clipPath').attr('id', `cl${{i}}`).append('circle').attr('r', r);
     if (d.avatar) {{
       node.filter((nd, ni) => ni === i)
-        .append('image')
-        .attr('href', d.avatar)
+        .append('image').attr('href', d.avatar)
         .attr('x', -r).attr('y', -r)
         .attr('width', r * 2).attr('height', r * 2)
         .attr('clip-path', `url(#cl${{i}})`);
     }}
   }});
 
-  // Label
   node.append('text')
-    .text(d => d.label.length > 14 ? d.label.slice(0, 13) + '…' : d.label)
-    .attr('y',            d => (d.type === 'target' ? 22 : 13) + 13)
-    .attr('text-anchor',  'middle')
-    .attr('fill',         d => colors[d.type])
-    .attr('font-size',    d => d.type === 'target' ? '11px' : '9px')
-    .attr('font-family',  "'Share Tech Mono', monospace");
+    .text(d => d.label.length > 12 ? d.label.slice(0, 11) + '…' : d.label)
+    .attr('y', d => (d.type === 'target' ? 20 : 12) + 12)
+    .attr('text-anchor', 'middle')
+    .attr('fill', d => C[d.type])
+    .attr('font-size', d => d.type === 'target' ? '10px' : '8px')
+    .attr('font-family', "'JetBrains Mono', monospace");
 
-  // Tooltip + click → Steam profile
   node
     .on('mouseover', (e, d) => {{
       tip.style.display = 'block';
-      tip.innerHTML = `<span style="color:${{colors[d.type]}}">${{d.type.toUpperCase()}}</span>  ${{d.label}}<br><span style="color:#698fa8">${{d.id}}</span>${{d.since ? '<br>since ' + d.since : ''}}<br><span style="color:#698fa8;font-size:10px">click to open profile</span>`;
+      tip.innerHTML = `<span style="color:${{C[d.type]}}">${{d.type}}</span>  ${{d.label}}<br><span style="color:#555">${{d.id}}</span>${{d.since ? '<br>since ' + d.since : ''}}`;
     }})
     .on('mousemove', e => {{
       const r = wrap.getBoundingClientRect();
@@ -486,7 +554,6 @@ function initGraph() {{
     }})
     .on('mouseout', () => tip.style.display = 'none')
     .on('click', (e, d) => {{
-      // only fire on click, not after drag
       if (e.defaultPrevented) return;
       window.open(`https://steamcommunity.com/profiles/${{d.id}}`, '_blank');
     }});
@@ -506,5 +573,4 @@ window.addEventListener('load', initGraph);
     with open(filename, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(f"\n✨ Report saved -> {filename}")
     return filename
