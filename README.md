@@ -37,7 +37,7 @@ python config.py
 
 ## 👻 Usage
 ```bash
-python findlikegabe.py
+python findlikegabe.py --id <steamID>
 ```
 
 ![Rarre](./github/example.png)
