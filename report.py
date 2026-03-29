@@ -149,7 +149,7 @@ def generate_report(
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>{target_nickname} — OSINT</title>
+<title>{target_nickname}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
