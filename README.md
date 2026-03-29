@@ -40,4 +40,4 @@ python config.py
 python findlikegabe.py --id <steamID>
 ```
 
-![Kipper](./github/example.png)
+![Rarre](./github/example.png)
