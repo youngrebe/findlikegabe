@@ -4,9 +4,9 @@
 - Pulls full comment history and extracts commentator IDs
 - Retrieves friend list (if public)
 - If friend list is **private** — reconstructs connections via **3-step handshake**:
-  - **1st** — checks commentators' friend lists for the target
-  - **2nd** — checks friends-of-commentators
-  - **3rd** — checks friends-of-friends-of-commentators
+  - **1st** - checks commentators' friend lists for the target
+  - **2nd** - checks friends-of-commentators
+  - **3rd** - checks friends-of-friends-of-commentators
 - Fetches profile archive: nickname history, real name history, URL history, avatar history
 - Generates a self-contained **HTML report** with interactive D3 grap
 
